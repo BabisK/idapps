@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+IMAGE_NAME=ghcr.io/helmfile/helmfile
+IMAGE_VERSION=canary
+
+mkdir -p "$HOME"/.kube
+mkdir -p "$HOME"/.helm
+mkdir -p "$HOME"/.config/helm
+mkdir -p "$HOME"/.cache/helm
+
+docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/helmfile -w /helmfile -v "$HOME"/.kube:/.kube -v "$HOME"/.helm:/.helm -v "$HOME"/.config/helm:/.config/helm -v "$HOME"/.cache/helm:/.cache/helm --entrypoint /usr/local/bin/helmfile $IMAGE_NAME:$IMAGE_VERSION "$@"
