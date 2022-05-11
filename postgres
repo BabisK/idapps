@@ -8,7 +8,7 @@ set -e
 CONTAINER_NAME=postgres
 VOLUME_NAME=postgres
 IMAGE_NAME=postgres
-IMAGE_VERSION=14.2-bullseye
+IMAGE_VERSION=14.2-alpine3.15
 HOST_PORT=5432
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres

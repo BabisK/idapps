@@ -2,14 +2,12 @@
 
 set -e
 
-. "$(dirname "$0")/lib/clean.sh"
 . "$(dirname "$0")/lib/stop.sh"
 
-CONTAINER_NAME=redis
-VOLUME_NAME=redis
-IMAGE_NAME=redis
-IMAGE_VERSION=7.0.0-alpine3.15
-HOST_PORT=6379
+CONTAINER_NAME=memcached
+IMAGE_NAME=memcached
+IMAGE_VERSION=1.6.15-alpine3.15
+HOST_PORT=11211
 
 start() {
     if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
@@ -17,7 +15,7 @@ start() {
         exit 1
     fi
 
-    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT:6379 -v $VOLUME_NAME:/data $IMAGE_NAME:$IMAGE_VERSION --save 60 1 > /dev/null 2>&1
+    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT:11211 $IMAGE_NAME:$IMAGE_VERSION > /dev/null 2>&1
     echo "$CONTAINER_NAME started at http://localhost:$HOST_PORT"
 }
 
@@ -27,10 +25,6 @@ fi
 
 if [ "$1" = "start" ]; then
     start
-fi
-
-if [ "$1" = "clean" ]; then
-    clean
 fi
 
 if [ $# -eq 0 ]; then
