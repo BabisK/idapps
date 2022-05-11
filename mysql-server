@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -e
+
+. "$(dirname "$0")/lib/clean.sh"
+. "$(dirname "$0")/lib/stop.sh"
+
+CONTAINER_NAME=mysql
+VOLUME_NAME=mysql
+IMAGE_NAME=mysql
+IMAGE_VERSION=8.0.29-debian
+HOST_PORT=3306
+MYSQL_ROOT_PASSWORD=root
+
+start() {
+    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "$CONTAINER_NAME is already running"
+        exit 1
+    fi
+
+    docker run --rm -d --name $CONTAINER_NAME -e MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD -p $HOST_PORT:3306 -v $VOLUME_NAME:/var/lib/mysql $IMAGE_NAME:$IMAGE_VERSION > /dev/null 2>&1
+    echo "$CONTAINER_NAME started at http://localhost:$HOST_PORT, username: root, password: $MYSQL_ROOT_PASSWORD"
+}
+
+if [ "$1" = "stop" ]; then
+    stop
+fi
+
+if [ "$1" = "start" ]; then
+    start
+fi
+
+if [ "$1" = "clean" ]; then
+    clean
+fi
+
+if [ $# -eq 0 ]; then
+    start
+fi
