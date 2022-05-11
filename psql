@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+CONTAINER_NAME=psql
+IMAGE_NAME=postgres
+IMAGE_VERSION=14.2-bullseye
+
+docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/postgres -w /postgres postgres:14.2-bullseye psql "$@"

@@ -1,0 +1,40 @@
+#!/bin/sh
+
+set -e
+
+. "$(dirname "$0")/lib/clean.sh"
+. "$(dirname "$0")/lib/stop.sh"
+
+CONTAINER_NAME=postgres
+VOLUME_NAME=postgres
+IMAGE_NAME=postgres
+IMAGE_VERSION=14.2-bullseye
+HOST_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+start() {
+    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "$CONTAINER_NAME is already running"
+        exit 1
+    fi
+
+    docker run --rm -d --name $CONTAINER_NAME -e POSTGRES_USER=$POSTGRES_USER -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD -p $HOST_PORT:5432 -v $VOLUME_NAME:/var/lib/postgresql/data $IMAGE_NAME:$IMAGE_VERSION > /dev/null 2>&1
+    echo "$CONTAINER_NAME started at http://localhost:$HOST_PORT, username: $POSTGRES_USER, password: $POSTGRES_PASSWORD"
+}
+
+if [ "$1" = "stop" ]; then
+    stop
+fi
+
+if [ "$1" = "start" ]; then
+    start
+fi
+
+if [ "$1" = "clean" ]; then
+    clean
+fi
+
+if [ $# -eq 0 ]; then
+    start
+fi

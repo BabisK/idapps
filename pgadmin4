@@ -1,0 +1,40 @@
+#!/bin/sh
+
+set -e
+
+. "$(dirname "$0")/lib/clean.sh"
+. "$(dirname "$0")/lib/stop.sh"
+
+CONTAINER_NAME=pgadmin4
+VOLUME_NAME=pgadmin4
+IMAGE_NAME=dpage/pgadmin4
+IMAGE_VERSION=6.8
+HOST_PORT=8080
+PGADMIN_DEFAULT_EMAIL=user@pgadmin.org
+PGADMIN_DEFAULT_PASSWORD=pgadmin
+
+start() {
+    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "$CONTAINER_NAME is already running"
+        exit 1
+    fi
+    
+    docker run --rm -d --name $CONTAINER_NAME -e PGADMIN_DEFAULT_EMAIL=$PGADMIN_DEFAULT_EMAIL -e PGADMIN_DEFAULT_PASSWORD=$PGADMIN_DEFAULT_PASSWORD -p $HOST_PORT:80 -v $VOLUME_NAME:/var/lib/pgadmin $IMAGE_NAME:$IMAGE_VERSION > /dev/null 2>&1
+    echo "$CONTAINER_NAME started at http://localhost:$HOST_PORT, username: $PGADMIN_DEFAULT_EMAIL, password: $PGADMIN_DEFAULT_PASSWORD"
+}
+
+if [ "$1" = "stop" ]; then
+    stop
+fi
+
+if [ "$1" = "start" ]; then
+    start
+fi
+
+if [ "$1" = "clean" ]; then
+    clean
+fi
+
+if [ $# -eq 0 ]; then
+    start
+fi
