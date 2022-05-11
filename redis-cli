@@ -1,0 +1,8 @@
+#!/bin/sh
+
+set -e
+
+IMAGE_NAME=redis
+IMAGE_VERSION=7.0.0-bullseye
+
+docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/redis -w /redis $IMAGE_NAME:$IMAGE_VERSION redis-cli "$@"
