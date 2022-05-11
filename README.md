@@ -45,7 +45,7 @@ after themselves.
 ## Installation
 
 1. Clone/download-and-extract this repository somewhere in your system.
-2. Add the root folder of the repository in your path
+2. Add the root folder of the repository in your path (e.g. export PATH=$PATH:$PWD)
 3. Ready!
 
 ## Common interface

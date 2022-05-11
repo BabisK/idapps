@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+IMAGE_NAME=alpine/helm
+IMAGE_VERSION=3.8.2
+
+mkdir -p "$HOME"/.kube
+mkdir -p "$HOME"/.helm
+mkdir -p "$HOME"/.config/helm
+mkdir -p "$HOME"/.cache/helm
+
+docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/helm -w /helm -v "$HOME"/.kube:/.kube -v "$HOME"/.helm:/.helm -v "$HOME"/.config/helm:/.config/helm -v "$HOME"/.cache/helm:/.cache/helm $IMAGE_NAME:$IMAGE_VERSION "$@"
