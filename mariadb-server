@@ -3,6 +3,7 @@
 set -e
 
 . "$(dirname "$0")/lib/clean.sh"
+. "$(dirname "$0")/lib/logs.sh"
 . "$(dirname "$0")/lib/stop.sh"
 
 CONTAINER_NAME=mariadb
@@ -32,6 +33,10 @@ fi
 
 if [ "$1" = "clean" ]; then
     clean
+fi
+
+if [ "$1" = "logs" ]; then
+    logs "$@"
 fi
 
 if [ $# -eq 0 ]; then

@@ -2,6 +2,7 @@
 
 set -e
 
+. "$(dirname "$0")/lib/logs.sh"
 . "$(dirname "$0")/lib/stop.sh"
 
 CONTAINER_NAME=phpmyadmin
@@ -25,6 +26,10 @@ fi
 
 if [ "$1" = "start" ]; then
     start
+fi
+
+if [ "$1" = "logs" ]; then
+    logs "$@"
 fi
 
 if [ $# -eq 0 ]; then
