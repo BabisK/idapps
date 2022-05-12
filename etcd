@@ -1,0 +1,44 @@
+#!/bin/sh
+
+set -e
+
+. "$(dirname "$0")/lib/clean.sh"
+. "$(dirname "$0")/lib/logs.sh"
+. "$(dirname "$0")/lib/stop.sh"
+
+CONTAINER_NAME=etcd
+VOLUME_NAME=etcd
+IMAGE_NAME=gcr.io/etcd-development/etcd
+IMAGE_VERSION=v3.5.4
+CLIENT_PORT=2379
+PEER_PORT=2380
+
+start() {
+    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "$CONTAINER_NAME is already running"
+        exit 1
+    fi
+
+    docker run --rm -d --name $CONTAINER_NAME -p $CLIENT_PORT:2379 -p $PEER_PORT:2380 -v $VOLUME_NAME:/etcd-data --entrypoint /usr/local/bin/etcd $IMAGE_NAME:$IMAGE_VERSION --listen-client-urls http://0.0.0.0:2379 --advertise-client-urls http://0.0.0.0:2379 > /dev/null 2>&1
+    echo "$CONTAINER_NAME started at localhost on client port $CLIENT_PORT and peer port $PEER_PORT"
+}
+
+if [ "$1" = "stop" ]; then
+    stop
+fi
+
+if [ "$1" = "start" ]; then
+    start
+fi
+
+if [ "$1" = "clean" ]; then
+    clean
+fi
+
+if [ "$1" = "logs" ]; then
+    logs "$@"
+fi
+
+if [ $# -eq 0 ]; then
+    start
+fi

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+set -e
+
+IMAGE_NAME=gcr.io/etcd-development/etcd
+IMAGE_VERSION=v3.5.4
+
+docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/etcd -w /etcd --entrypoint /usr/local/bin/etcdctl $IMAGE_NAME:$IMAGE_VERSION "$@"
