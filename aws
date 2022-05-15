@@ -1,0 +1,8 @@
+#!/bin/sh
+
+set -e
+
+IMAGE_NAME=amazon/aws-cli
+IMAGE_VERSION=2.7.0
+
+docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$HOME"/.aws:/tmp/.aws -v "$(pwd)":/aws -e AWS_CONFIG_FILE=/tmp/.aws/config -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials $IMAGE_NAME:$IMAGE_VERSION "$@"
