@@ -19,7 +19,7 @@ start() {
         exit 1
     fi
 
-    docker run --rm -d --name $CONTAINER_NAME -p $CLIENT_PORT:2379 -p $PEER_PORT:2380 -v $VOLUME_NAME:/etcd-data --entrypoint /usr/local/bin/etcd $IMAGE_NAME:$IMAGE_VERSION --listen-client-urls http://0.0.0.0:2379 --advertise-client-urls http://0.0.0.0:2379 > /dev/null 2>&1
+    docker run --rm -d --name $CONTAINER_NAME -p $CLIENT_PORT:2379 -p $PEER_PORT:2380 -v $VOLUME_NAME:/etcd-data --entrypoint /usr/local/bin/etcd $IMAGE_NAME:$IMAGE_VERSION --listen-client-urls http://0.0.0.0:2379 --advertise-client-urls http://0.0.0.0:2379 1> /dev/null
     echo "$CONTAINER_NAME started at localhost on client port $CLIENT_PORT and peer port $PEER_PORT"
 }
 

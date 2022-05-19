@@ -18,8 +18,8 @@ start() {
         exit 1
     fi
 
-    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT:6379 -v $VOLUME_NAME:/data $IMAGE_NAME:$IMAGE_VERSION --save 60 1 > /dev/null 2>&1
-    echo "$CONTAINER_NAME started at http://localhost:$HOST_PORT"
+    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT:6379 -v $VOLUME_NAME:/data $IMAGE_NAME:$IMAGE_VERSION --save 60 1 1> /dev/null
+    echo "$CONTAINER_NAME started on localhost, listening on port $HOST_PORT"
 }
 
 if [ "$1" = "stop" ]; then

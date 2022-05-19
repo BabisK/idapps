@@ -19,8 +19,8 @@ start() {
         exit 1
     fi
 
-    docker run --rm -d --name $CONTAINER_NAME -e MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD -p $HOST_PORT:3306 -v $VOLUME_NAME:/var/lib/mysql $IMAGE_NAME:$IMAGE_VERSION > /dev/null 2>&1
-    echo "$CONTAINER_NAME started at http://localhost:$HOST_PORT, username: root, password: $MYSQL_ROOT_PASSWORD"
+    docker run --rm -d --name $CONTAINER_NAME -e MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD -p $HOST_PORT:3306 -v $VOLUME_NAME:/var/lib/mysql $IMAGE_NAME:$IMAGE_VERSION 1> /dev/null
+    echo "$CONTAINER_NAME started at localhost, listening on port $HOST_PORT, username: root, password: $MYSQL_ROOT_PASSWORD"
 }
 
 if [ "$1" = "stop" ]; then

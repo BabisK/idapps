@@ -18,7 +18,7 @@ start() {
         exit 1
     fi
 
-    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT_1:4222 -p $HOST_PORT_2:6222 -p $HOST_PORT_3:8222 $IMAGE_NAME:$IMAGE_VERSION > /dev/null 2>&1
+    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT_1:4222 -p $HOST_PORT_2:6222 -p $HOST_PORT_3:8222 $IMAGE_NAME:$IMAGE_VERSION 1> /dev/null
     echo "$CONTAINER_NAME started at localhost, listening on client port $HOST_PORT_1, cluster port $HOST_PORT_2 and monitorint port $HOST_PORT_3."
 }
 
