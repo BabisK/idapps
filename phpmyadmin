@@ -7,7 +7,7 @@ set -e
 
 CONTAINER_NAME=phpmyadmin
 IMAGE_NAME=phpmyadmin
-IMAGE_VERSION=5.1.3-apache
+IMAGE_VERSION=5.2.0-apache
 HOST_PORT=8082
 
 start() {
