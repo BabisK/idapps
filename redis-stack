@@ -1,0 +1,44 @@
+#!/bin/sh
+
+set -e
+
+. "$(dirname "$0")/lib/clean.sh"
+. "$(dirname "$0")/lib/logs.sh"
+. "$(dirname "$0")/lib/stop.sh"
+
+CONTAINER_NAME=redis-stack
+VOLUME_NAME=redis-stack
+IMAGE_NAME=redis/redis-stack
+IMAGE_VERSION=6.2.4-v3
+HOST_PORT=6379
+REDIS_INSIGHTS_PORT=8083
+
+start() {
+    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "$CONTAINER_NAME is already running"
+        exit 1
+    fi
+
+    docker run --rm -d --name $CONTAINER_NAME -p $HOST_PORT:6379 -p $REDIS_INSIGHTS_PORT:8001 -v $VOLUME_NAME:/data $IMAGE_NAME:$IMAGE_VERSION > /dev/null
+    echo "$CONTAINER_NAME started on localhost, listening on port $HOST_PORT, RedisInsights on $REDIS_INSIGHTS_PORT"
+}
+
+if [ "$1" = "stop" ]; then
+    stop
+fi
+
+if [ "$1" = "start" ]; then
+    start
+fi
+
+if [ "$1" = "clean" ]; then
+    clean
+fi
+
+if [ "$1" = "logs" ]; then
+    logs "$@"
+fi
+
+if [ $# -eq 0 ]; then
+    start
+fi
