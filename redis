@@ -9,7 +9,7 @@ set -e
 CONTAINER_NAME=redis
 VOLUME_NAME=redis
 IMAGE_NAME=redis
-IMAGE_VERSION=7.0.0-alpine3.15
+IMAGE_VERSION=7.0.5-alpine3.16
 HOST_PORT=6379
 
 start() {
