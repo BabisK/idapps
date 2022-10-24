@@ -7,7 +7,7 @@ set -e
 
 CONTAINER_NAME=memcached
 IMAGE_NAME=memcached
-IMAGE_VERSION=1.6.15-alpine3.15
+IMAGE_VERSION=1.6.17-alpine3.16
 HOST_PORT=11211
 
 start() {
