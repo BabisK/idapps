@@ -3,6 +3,6 @@
 set -e
 
 IMAGE_NAME=natsio/nats-box
-IMAGE_VERSION=0.11.0
+IMAGE_VERSION=0.13.2
 
 docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/nats -w /nats --entrypoint /usr/local/bin/nats $IMAGE_NAME:$IMAGE_VERSION "$@"
