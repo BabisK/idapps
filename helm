@@ -3,7 +3,7 @@
 set -e
 
 IMAGE_NAME=alpine/helm
-IMAGE_VERSION=3.8.2
+IMAGE_VERSION=3.22.1
 
 mkdir -p "$HOME"/.kube
 mkdir -p "$HOME"/.helm
