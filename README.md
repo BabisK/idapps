@@ -28,8 +28,8 @@ systems such as databases. Commands are single shot applications like `psql` or 
 In general services use some default user (no security), occupy a host port - either by port-mapping or by using host
 networking (so, you cannot run multiple instances of the service) and use docker volumes for persistence.
 
-In the same spirit, commands mount the current path in their workspace, use the host user and group id to avoid
-permissions issues and forward all user parameters to the container. So, running a command with IDApps should be
+In the same spirit, most commands mount the current path in their workspace; `kubectl` mounts only its configuration.
+The POSIX wrappers use the host user and group id to avoid permissions issues and forward all user parameters to the container. So, running a command with IDApps should be
 identical to running it if it was installed.
 
 ### Portable
@@ -58,3 +58,60 @@ executed
 time you start it, it will pick it up and use it.
 3. `clean`: This should remove the persistence storage. If you messed up and need to start over, this is the target to
 use.
+## Windows PowerShell
+
+The `powershell` directory provides Windows PowerShell 5.1 and PowerShell 7
+entry points. Install Docker Desktop with Linux containers enabled, start its
+engine, and clone or extract the entire repository. In PowerShell, append the
+entry-point directory to your PATH (replace the path with your checkout):
+
+```powershell
+$env:PATH += ';C:\path\to\idapps\powershell'
+psql --version
+```
+
+Add the PATH line to your PowerShell profile to keep it for future sessions.
+Your execution policy must allow local scripts; for example, an administrator
+may configure `RemoteSigned` for your account. Files downloaded from the web
+may need to be unblocked. Use `Get-Command psql -All` to inspect resolution.
+Aliases and functions take precedence; an executable earlier in PATH also wins.
+Invoke the script by full path to select IDApps in case of a conflict:
+
+```powershell
+& 'C:\path\to\idapps\powershell\psql.ps1' --version
+& 'C:\path\to\idapps\powershell\postgres.ps1' start
+& 'C:\path\to\idapps\powershell\postgres.ps1' logs -f -t 50
+& 'C:\path\to\idapps\powershell\postgres.ps1' stop
+& 'C:\path\to\idapps\powershell\postgres.ps1' clean
+```
+
+The clients use Docker host networking as the shell wrappers do. On Docker
+Desktop this requires a version supporting host networking and enabling it in
+Settings > Resources > Network; restart Docker Desktop after changing it.
+With host networking enabled, for example, start `postgres`, then connect with
+`psql -h localhost -U postgres` (password `postgres`). Published service ports
+are accessible on localhost. Host networking has Docker Desktop limitations;
+consult Docker's host networking documentation for your platform.
+
+PowerShell mounts the current filesystem directory and applicable configuration
+under your Windows home directory, including `.aws` and `.kube`. Docker Desktop
+must have access to those paths; credential helpers or paths referenced inside a
+configuration file must also be available inside the container. Unlike POSIX
+wrappers, Windows clients run as the image's default user because Windows has no
+portable POSIX UID/GID. Files created in bind mounts may therefore have different
+ownership. TTY allocation is omitted for redirected input or output, allowing
+pipelines; terminal behavior depends on the host and container application.
+Images and service credentials remain intended for local development only.
+
+Run the mock checks in either PowerShell version with
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\powershell-tests.ps1`
+(or `pwsh` in place of `powershell`). The checks do not replace real Docker
+connectivity and interactive terminal tests. Development verification used Windows
+PowerShell 5.1.26100.9818 and PowerShell 7.6.9 on Windows build 26300 with a
+mock Docker executable, and a Redis service and client connection on Docker
+Desktop engine 29.9.3 using PowerShell 5.1, including an interactive Redis
+client session. Other supported Windows and Docker versions have not been verified
+in this environment.
+
+PowerShell pipelines transmit text rather than raw bytes, so binary input is not
+guaranteed to survive a pipeline unchanged.
