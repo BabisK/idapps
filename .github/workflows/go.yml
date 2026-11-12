@@ -1,0 +1,148 @@
+name: native launcher
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test -v ./... -args '-ginkgo.v'
+      - run: go vet ./...
+      - name: Check catalogue against supported release parsers
+        run: go run ./tools/catalogue-compat
+      - name: Cross-compile supported targets
+        shell: bash
+        run: |
+          for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64 darwin/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go build ./...
+          done
+  renovate-config:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npx --yes --package renovate@44.226.2 renovate-config-validator --strict renovate.json
+
+  ubuntu-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-26.04, arch: amd64, machine: x86_64}
+          - {runner: ubuntu-26.04-arm, arch: arm64, machine: aarch64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify native runner
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+          EXPECTED_MACHINE: ${{ matrix.machine }}
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          [[ "$ID" == ubuntu && "$VERSION_ID" == 26.04 ]]
+          [[ "$(uname -m)" == "$EXPECTED_MACHINE" && "$(go env GOARCH)" == "$EXPECTED_ARCH" ]]
+          uname -a
+          go version
+      - name: Build and test on native Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/idapps" .
+          go test -v ./... -args '-ginkgo.v'
+          "$RUNNER_TEMP/idapps" help
+          "$RUNNER_TEMP/idapps" version
+  macos-native:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test on native macOS arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == arm64 && "$(go env GOARCH)" == arm64 ]]
+          sw_vers
+          uname -a
+          go version
+          go test -v ./... -args '-ginkgo.v'
+          go vet ./...
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/idapps" .
+          export HOME="$RUNNER_TEMP/idapps-home"
+          mkdir -p "$HOME"
+          "$RUNNER_TEMP/idapps" help
+          "$RUNNER_TEMP/idapps" version
+  windows-native:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test on native Windows amd64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ((go env GOARCH) -ne 'amd64') { throw 'Expected native Windows amd64 Go' }
+          [System.Environment]::OSVersion.VersionString
+          go version
+          go test -v ./... -args '-ginkgo.v'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go vet ./...
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CGO_ENABLED = '0'
+          go build -o (Join-Path $env:RUNNER_TEMP 'idapps.exe') .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: PowerShell 5.1 launcher smoke test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSVersionTable.PSVersion.ToString()
+          $env:APPDATA = Join-Path $env:RUNNER_TEMP 'idapps-roaming-ps5'
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'idapps-local-ps5'
+          & (Join-Path $env:RUNNER_TEMP 'idapps.exe') help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $env:RUNNER_TEMP 'idapps.exe') version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: PowerShell 7 launcher smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSVersionTable.PSVersion.ToString()
+          $env:APPDATA = Join-Path $env:RUNNER_TEMP 'idapps-roaming-ps7'
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'idapps-local-ps7'
+          & (Join-Path $env:RUNNER_TEMP 'idapps.exe') help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $env:RUNNER_TEMP 'idapps.exe') version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
