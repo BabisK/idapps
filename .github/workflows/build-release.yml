@@ -20,10 +20,10 @@ jobs:
   verify:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - run: go test -v ./... -args '-ginkgo.v'
@@ -41,10 +41,10 @@ jobs:
           - {goos: darwin, goarch: arm64, runner: macos-26}
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Build portable executable
@@ -68,7 +68,7 @@ jobs:
           fi
           CGO_ENABLED=0 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build -trimpath -ldflags "$ldflags" -o "dist/$name" .
           echo "ASSET=dist/$name" >> "$GITHUB_ENV"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: idapps-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ${{ env.ASSET }}
@@ -77,8 +77,8 @@ jobs:
     needs: build
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -99,7 +99,7 @@ jobs:
           for asset in "${assets[@]}"; do test -f "$asset"; done
           sha256sum "${assets[@]}" > SHA256SUMS
           cp ../LICENSE ../README.md .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-assets
           path: dist/*
@@ -112,10 +112,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-assets
           path: dist
