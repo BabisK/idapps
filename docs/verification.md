@@ -1,5 +1,11 @@
 # Native launcher verification record
 
+## Hosted native verification
+
+The GitHub Actions run for PR #20, commit `6b9f9878d9de45b8a511d5097ad4c72d458a88f0`, passed the native launcher jobs on `ubuntu-26.04` amd64, `ubuntu-26.04-arm` arm64, `macos-26` arm64 and `windows-2025` amd64, as well as the verify and Renovate jobs: [run 43247514060](https://github.com/BabisK/idapps/actions/runs/43247514060). These are native launcher and fake-API checks; they do not verify real Docker engines or image compatibility. Windows ARM64 and the separate real-engine checks remain gaps.
+
+On 2026-11-12, the opt-in Redis integration scenario passed on Ubuntu 26.04.1 LTS under WSL2 amd64 with Docker Desktop 4.99.0, Engine 29.9.3, API 1.56 and Linux amd64 containers. It used an already cached Redis image and isolated test-owned resources, checked client access, refused cleanup while running, and verified data persistence across restart. This is WSL2 with Docker Desktop, not a native Ubuntu Docker Engine result. The initial attempt failed because the test launcher was named `idapps-spec-verification`; repeating with the required `idapps` basename passed.
+
 2026-11-10, local development run:
 
 - Renovate 44.226.2: `renovate-config-validator --strict renovate.json` passed; a local Renovate extraction discovered all 22 image objects, and the Go extraction test covered all six digest field orders. An actual Renovate update/write-back remains untested.
@@ -11,7 +17,7 @@
 - WinGet 1.29.380 validated a temporary portable singleton manifest with the local executable SHA-256. Its URL was deliberately non-downloadable; installation was not tested and nothing was published.
 - Windows amd64 with Docker Desktop Engine 29.9.3, API 1.56, Linux amd64 containers: an isolated Redis service and `redis-cli` returned `PONG`; a second isolated service preserved a value across stop/restart, produced tailed logs and refused `clean` while running. Both tests stopped and cleaned their own uniquely named resources. A further isolated test sent `PING` through redirected native stdin, closed it, received `PONG` on stdout, and exited successfully; it also cleaned its service resources. An ephemeral `/bin/cat` command round-tripped native redirected bytes `00 01 7F 80 FF 0D 0A` and exited 0; this does not assert PowerShell 5 pipeline byte preservation. A first attempt from a WSL UNC working directory failed because Docker Desktop could not access the WSL distribution mount service; repeating from a native Windows temporary directory passed.
 
-These checks do not cover the full acceptance matrix. Ubuntu 26.04 native engines on both Linux architectures, Windows ARM64, macOS Apple silicon, all 22 images, POSIX interactive TTY/resize/cancellation, console restoration, comprehensive fault injection and downloaded release assets remain unverified. WinGet distribution, including installation testing, and Apple Developer ID signing and notarization are deferred. No release or WinGet package was published.
+These local checks do not cover the full acceptance matrix. Ubuntu 26.04 native engines on both Linux architectures, Windows ARM64, real Docker on macOS Apple silicon, all 22 images, POSIX interactive TTY/resize/cancellation, console restoration, comprehensive fault injection and downloaded release assets remain unverified. WinGet distribution, including installation testing, and Apple Developer ID signing and notarization are deferred. No release or WinGet package was published as part of these checks.
 
 ## Renovate JSONata manager
 
@@ -49,11 +55,11 @@ Anonymous registry inspection at 2026-11-10 21:48 UTC found the following same-v
 
 ## Native platform CI coverage planned
 
-The `native launcher` workflow defines native GitHub-hosted `ubuntu-26.04` and `ubuntu-26.04-arm` jobs. They check OS and CPU identity, build the launcher, run the offline Go suite and perform launcher smoke checks. The jobs have not been run here and are not verification results.
+The `native launcher` workflow defines native GitHub-hosted `ubuntu-26.04` and `ubuntu-26.04-arm` jobs. They check OS and CPU identity, build the launcher, run the offline Go suite and perform launcher smoke checks. A passing hosted run is recorded above.
 
 Real-engine and image-compatibility verification is performed separately on available native machines; results and untested targets remain recorded here. The opt-in local Redis integration test requires its image to be cached beforehand and does not intentionally pull an image. Default automated tests use local fixtures or fake services rather than GitHub or external network services.
 
-The workflow also defines native `macos-26` arm64 and `windows-2025` amd64 jobs for Go tests, vet and launcher smoke checks; the Windows job checks both PowerShell 5.1 and PowerShell 7. Those hosted jobs do not claim or attempt Docker Desktop coverage. They have not been run here and are not verification results.
+The workflow also defines native `macos-26` arm64 and `windows-2025` amd64 jobs for Go tests, vet and launcher smoke checks; the Windows job checks both PowerShell 5.1 and PowerShell 7. A passing hosted run is recorded above. Those jobs do not claim or attempt Docker Desktop coverage.
 
 ## Selected kubectl image
 
@@ -74,7 +80,7 @@ The following local automated checks ran on WSL2 Linux amd64 with Go 1.26.8. The
 
 On 2026-11-11, the updated fake-Engine and update test binaries also passed on Windows amd64 build 26300 under Windows PowerShell 5.1.26100.9818. The POSIX pseudo-terminal tests are not part of that Windows run.
 
-The default `go test ./...` run skips the opt-in real-Docker Linux integration test when `IDAPPS_DOCKER_INTEGRATION` is not set. No GitHub-hosted runner result is claimed by these local checks.
+The default `go test ./...` run skips the opt-in real-Docker Linux integration test when `IDAPPS_DOCKER_INTEGRATION` is not set. The local checks in this section are separate from the hosted results recorded above.
 
 ## BDD suite migration
 
