@@ -2,7 +2,6 @@ package update
 
 import (
 	"context"
-	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,7 +15,7 @@ var _ = Describe("saved service definitions", func() {
 	BeforeEach(func() {
 		var err error
 		store, _ = testStore(GinkgoT())
-		data, err := os.ReadFile("../../catalogue.json")
+		data, err := catalogue.ReadTree("../../catalogue", "1.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		c, err := catalogue.Parse(data, "0.0.0")
 		Expect(err).NotTo(HaveOccurred())

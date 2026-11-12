@@ -1,0 +1,33 @@
+{
+  "kind": "service",
+  "image": {
+    "repository": "mysql",
+    "tag": "26.10.0"
+  },
+  "network": "bridge",
+  "user": {
+    "linux": "image",
+    "windows": "image",
+    "darwin": "image"
+  },
+  "containerName": "mysql",
+  "ports": [
+    {
+      "hostPort": 3306,
+      "containerPort": 3306,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    }
+  ],
+  "mounts": [
+    {
+      "type": "volume",
+      "name": "mysql",
+      "target": "/var/lib/mysql",
+      "readOnly": false
+    }
+  ],
+  "environment": {
+    "MYSQL_ROOT_PASSWORD": "root"
+  }
+}

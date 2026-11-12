@@ -257,7 +257,7 @@ var _ = Describe("Catalogue command Docker requests", func() {
 	var mock *MockRoundTripper
 	var cwd, home string
 	BeforeEach(func() {
-		document, err := os.ReadFile("../../catalogue.json")
+		document, err := catalogue.ReadTree("../../catalogue", "1.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		parsed, err := catalogue.Parse(document, "0.0.0")
 		Expect(err).NotTo(HaveOccurred())

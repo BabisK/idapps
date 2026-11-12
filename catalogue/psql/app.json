@@ -1,0 +1,29 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "postgres",
+    "tag": "15.1-alpine3.16"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "args": [
+    "psql"
+  ],
+  "workdir": "/postgres",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/postgres",
+      "create": false,
+      "readOnly": false
+    }
+  ]
+}

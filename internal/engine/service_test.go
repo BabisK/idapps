@@ -18,7 +18,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -307,7 +306,7 @@ var _ = Describe("service lifecycle", func() {
 			store, e := update.NewStore(paths, "1.0.0")
 			Expect(e).NotTo(HaveOccurred())
 
-			b, e := os.ReadFile("../../catalogue.json")
+			b, e := catalogue.ReadTree("../../catalogue", "1.0.0")
 			Expect(e).NotTo(HaveOccurred())
 
 			cat, e := catalogue.Parse(b, "1.0.0")
@@ -603,7 +602,7 @@ var _ = Describe("Catalogue service Docker requests", func() {
 	var mock *MockRoundTripper
 	var store *update.Store
 	BeforeEach(func() {
-		document, err := os.ReadFile("../../catalogue.json")
+		document, err := catalogue.ReadTree("../../catalogue", "1.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		parsed, err := catalogue.Parse(document, "0.0.0")
 		Expect(err).NotTo(HaveOccurred())

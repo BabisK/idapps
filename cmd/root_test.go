@@ -54,9 +54,38 @@ var _ = Describe("The launcher", func() {
 	When("the catalogue is updated", func() {
 		It("installs and repairs links using only mocked HTTP responses", func() {
 			const commit = "0123456789abcdef0123456789abcdef01234567"
-			data, err := os.ReadFile("../catalogue.json")
+			const treeSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+			entries := []map[string]string{}
+			files := map[string]string{}
+			err := filepath.WalkDir("../catalogue", func(p string, d os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if p == "../catalogue" {
+					return nil
+				}
+				rel, err := filepath.Rel("../catalogue", p)
+				if err != nil {
+					return err
+				}
+				rel = filepath.ToSlash(rel)
+				item := map[string]string{"path": rel, "type": "blob", "mode": "100644"}
+				if d.IsDir() {
+					item["type"] = "tree"
+					item["mode"] = "040000"
+				} else {
+					b, e := os.ReadFile(p)
+					if e != nil {
+						return e
+					}
+					files[rel] = string(b)
+				}
+				entries = append(entries, item)
+				return nil
+			})
 			Expect(err).NotTo(HaveOccurred())
 			var requests []string
+			invalidTree := false
 			previous := http.DefaultTransport
 			DeferCleanup(func() { http.DefaultTransport = previous })
 			http.DefaultTransport = catalogueTransport(func(req *http.Request) (*http.Response, error) {
@@ -65,10 +94,20 @@ var _ = Describe("The launcher", func() {
 				switch req.URL.String() {
 				case "https://api.github.com/repos/BabisK/idapps/commits/main":
 					body = fmt.Sprintf(`{"sha":%q}`, commit)
-				case "https://raw.githubusercontent.com/BabisK/idapps/" + commit + "/catalogue.json":
-					body = string(data)
+				case "https://api.github.com/repos/BabisK/idapps/git/trees/" + commit:
+					body = fmt.Sprintf(`{"sha":%q,"truncated":false,"tree":[{"path":"catalogue","type":"tree","mode":"040000","sha":%q}]}`, commit, treeSHA)
+				case "https://api.github.com/repos/BabisK/idapps/git/trees/" + treeSHA + "?recursive=1":
+					b, err := json.Marshal(map[string]any{"sha": treeSHA, "truncated": invalidTree, "tree": entries})
+					if err != nil {
+						return nil, err
+					}
+					body = string(b)
 				default:
-					return nil, fmt.Errorf("unexpected request %s", req.URL)
+					prefix := "https://raw.githubusercontent.com/BabisK/idapps/" + commit + "/catalogue/"
+					if !strings.HasPrefix(req.URL.String(), prefix) {
+						return nil, fmt.Errorf("unexpected request %s", req.URL)
+					}
+					body = files[strings.TrimPrefix(req.URL.String(), prefix)]
 				}
 				return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header), Request: req}, nil
 			})
@@ -102,7 +141,21 @@ var _ = Describe("The launcher", func() {
 			target, err := os.Readlink(filepath.Join(paths.Bin, "psql"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(target).To(Equal(executable))
-			Expect(requests).To(HaveLen(6))
+			Expect(requests).To(HaveLen(3 * (3 + len(files))))
+			invalidTree = true
+			Expect(run([]string{"idapps", "update"})).NotTo(Equal(0))
+			Expect(store.WithLock(context.Background(), func() error {
+				current, actualCommit, err := store.Snapshot()
+				if err != nil {
+					return err
+				}
+				Expect(actualCommit).To(Equal(commit))
+				Expect(current.Apps).To(Equal(apps))
+				return nil
+			})).To(Succeed())
+			target, err = os.Readlink(filepath.Join(paths.Bin, "psql"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(target).To(Equal(executable))
 		})
 	})
 
@@ -172,7 +225,7 @@ var _ = Describe("Cobra app invocation", func() {
 			Entry("app name resembling a flag", []string{"idapps", "run", "--help"}, "linux", "--help", []string{}),
 		)
 		It("supports every catalogue app through all invocation forms", func() {
-			data, err := os.ReadFile("../catalogue.json")
+			data, err := catalogue.ReadTree("../catalogue", "1.0.0")
 			Expect(err).NotTo(HaveOccurred())
 			catalogue, err := catalogue.Parse(data, "1.0.0")
 			Expect(err).NotTo(HaveOccurred())
@@ -254,7 +307,7 @@ var _ = Describe("executing the installed launcher", Ordered, func() {
 		var err error
 		paths, err = storage.Resolve()
 		Expect(err).NotTo(HaveOccurred())
-		data, err := os.ReadFile("../catalogue.json")
+		data, err := catalogue.ReadTree("../catalogue", "1.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		c, err := catalogue.Parse(data, "0.0.0")
 		Expect(err).NotTo(HaveOccurred())

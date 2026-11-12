@@ -1,0 +1,35 @@
+{
+  "kind": "service",
+  "image": {
+    "repository": "redis",
+    "tag": "7.0.5-alpine3.16"
+  },
+  "network": "bridge",
+  "user": {
+    "linux": "image",
+    "windows": "image",
+    "darwin": "image"
+  },
+  "containerName": "redis",
+  "ports": [
+    {
+      "hostPort": 6379,
+      "containerPort": 6379,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    }
+  ],
+  "mounts": [
+    {
+      "type": "volume",
+      "name": "redis",
+      "target": "/data",
+      "readOnly": false
+    }
+  ],
+  "args": [
+    "--save",
+    "60",
+    "1"
+  ]
+}

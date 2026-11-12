@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/BabisK/idapps/internal/catalogue"
 	"net"
 	"os"
 	"os/exec"
@@ -76,7 +77,7 @@ var _ = Describe("A Redis service on a local Docker engine", func() {
 
 			port := listener.Addr().(*net.TCPAddr).Port
 			listener.Close()
-			b, err := os.ReadFile("../../catalogue.json")
+			b, err := catalogue.ReadTree("../../catalogue", "1.0.0")
 			Expect(err).NotTo(HaveOccurred())
 
 			var doc map[string]any

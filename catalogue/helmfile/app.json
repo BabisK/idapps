@@ -1,0 +1,70 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "ghcr.io/helmfile/helmfile",
+    "tag": "canary"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "entrypoint": [
+    "/usr/local/bin/helmfile"
+  ],
+  "workdir": "/helmfile",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/helmfile",
+      "create": false,
+      "readOnly": false
+    },
+    {
+      "type": "bind",
+      "source": {
+        "base": "home",
+        "path": ".kube"
+      },
+      "target": "/.kube",
+      "create": true,
+      "readOnly": false
+    },
+    {
+      "type": "bind",
+      "source": {
+        "base": "home",
+        "path": ".helm"
+      },
+      "target": "/.helm",
+      "create": true,
+      "readOnly": false
+    },
+    {
+      "type": "bind",
+      "source": {
+        "base": "home",
+        "path": ".config/helm"
+      },
+      "target": "/.config/helm",
+      "create": true,
+      "readOnly": false
+    },
+    {
+      "type": "bind",
+      "source": {
+        "base": "home",
+        "path": ".cache/helm"
+      },
+      "target": "/.cache/helm",
+      "create": true,
+      "readOnly": false
+    }
+  ],
+  "args": []
+}

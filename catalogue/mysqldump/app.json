@@ -1,0 +1,29 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "mysql",
+    "tag": "26.10.0"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "args": [
+    "mysqldump"
+  ],
+  "workdir": "/mysql",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/mysql",
+      "create": false,
+      "readOnly": false
+    }
+  ]
+}

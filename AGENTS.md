@@ -1,6 +1,6 @@
 # Instant Docker Apps
 
-IDApps is a Go launcher for Docker-backed developer tools and short-lived services. Application definitions live in `catalogue.json` and must satisfy `catalogue.schema.json` and the semantic checks in `internal/catalogue`. Usage and lifecycle behavior are documented in `README.md`.
+IDApps is a Go launcher for Docker-backed developer tools and short-lived services. Application definitions live in `catalogue/<name>/app.json` and must satisfy `catalogue/catalogue.schema.json` and the semantic checks in `internal/catalogue`. Usage and lifecycle behavior are documented in `README.md`.
 
 ## Policy
 
@@ -17,3 +17,5 @@ IDApps is a Go launcher for Docker-backed developer tools and short-lived servic
 - `internal/catalogue/`, `internal/storage/`, `internal/update/` and `internal/engine/` contain validation, per-user state, reconciliation and runtime behavior.
 - `_bmad-output/specs/spec-native-launcher/` contains the approved launcher contract and companions.
 - `docs/verification.md` records tested environments and verification gaps.
+
+Application descriptors live in `catalogue/<name>/app.json`, with shared metadata in `catalogue/metadata.json`. Validate the tree and release compatibility with `go run ./tools/catalogue-compat`.
