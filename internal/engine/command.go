@@ -244,13 +244,16 @@ func RunCommand(ctx context.Context, a catalogue.App, args []string) (int, error
 		defer term.Restore(int(stdin.Fd()), state)
 	}
 	wait, errs := cli.ContainerWait(ctx, created.ID, container.WaitConditionNextExit)
-	if e = cli.ContainerStart(ctx, created.ID, container.StartOptions{}); e != nil {
-		return commandFailure(ctx, fmt.Errorf("start command container: %w", e))
-	}
 	interrupt := func() {
 		interruptCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = cli.ContainerKill(interruptCtx, created.ID, "SIGINT")
+	}
+	if e = cli.ContainerStart(ctx, created.ID, container.StartOptions{}); e != nil {
+		if ctx.Err() != nil {
+			interrupt()
+		}
+		return commandFailure(ctx, fmt.Errorf("start command container: %w", e))
 	}
 	streamFailure := func(err error) (int, error) {
 		if ctx.Err() != nil {

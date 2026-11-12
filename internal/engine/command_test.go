@@ -413,7 +413,7 @@ var _ = Describe("Command bind mounts", func() {
 
 var _ = Describe("running a Docker-backed command", func() {
 	Context("when execution is cancelled", func() {
-		It("interrupts and removes only its own container on cancellation", func() {
+		DescribeTable("interrupts and removes only its own container on cancellation", func(holdStartResponse bool) {
 			t := GinkgoT()
 			old := openEngine
 			defer func() { openEngine = old }()
@@ -434,7 +434,9 @@ var _ = Describe("running a Docker-backed command", func() {
 			os.Stdin, os.Stdout, os.Stderr = in, out, errout
 			started := make(chan struct{})
 			events := make(chan string, 20)
-			dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			dial := func(_ context.Context, network, addr string) (net.Conn, error) {
 				local, remote := net.Pipe()
 				go func() {
 					defer remote.Close()
@@ -449,6 +451,9 @@ var _ = Describe("running a Docker-backed command", func() {
 					if strings.HasSuffix(p, "/attach") {
 						_, _ = fmt.Fprint(remote, "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Type: application/vnd.docker.raw-stream\r\n\r\n")
 						_, _ = io.Copy(io.Discard, remote)
+						if !holdStartResponse && r.URL.Query().Get("stdin") == "1" && r.URL.Query().Get("stdout") != "1" {
+							close(started)
+						}
 						return
 					}
 					if strings.HasSuffix(p, "/wait") {
@@ -461,9 +466,13 @@ var _ = Describe("running a Docker-backed command", func() {
 					case strings.HasSuffix(p, "/containers/create"):
 						body = `{"Id":"owned-command"}`
 					case strings.HasSuffix(p, "/start"):
+						if holdStartResponse {
+							close(started)
+							<-ctx.Done()
+							return
+						}
 						status = "204 No Content"
 						body = ""
-						defer close(started)
 					case strings.HasSuffix(p, "/kill"), r.Method == "DELETE":
 						status = "204 No Content"
 						body = ""
@@ -475,8 +484,6 @@ var _ = Describe("running a Docker-backed command", func() {
 			openEngine = func(context.Context) (*client.Client, error) {
 				return client.NewClientWithOpts(client.WithHost("http://docker"), client.WithVersion("1.47"), client.WithHTTPClient(&http.Client{Transport: &http.Transport{DialContext: dial}}))
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			type result struct {
 				code int
 				err  error
@@ -499,9 +506,9 @@ var _ = Describe("running a Docker-backed command", func() {
 			case <-time.After(5 * time.Second):
 				t.Fatal("canceled command did not return")
 			}
-			close(events)
 			var kill, remove, pull bool
-			for e := range events {
+			for len(events) > 0 {
+				e := <-events
 				if strings.Contains(e, "/containers/owned-command/kill?") && strings.Contains(e, "signal=SIGINT") {
 					kill = true
 				}
@@ -516,7 +523,10 @@ var _ = Describe("running a Docker-backed command", func() {
 			}
 			Expect(!kill || !remove || pull).To(BeFalse(), "interrupt=%v remove=%v unexpected pull=%v", kill, remove, pull)
 
-		})
+		},
+			Entry("after the start response", false),
+			Entry("while the start response is pending", true),
+		)
 		It("returns cancellation when image inspection is interrupted", func() {
 
 			old := openEngine
