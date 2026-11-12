@@ -65,16 +65,22 @@ func ensureImage(ctx context.Context, cli *client.Client, ref string) error {
 		return fmt.Errorf("pull image %s anonymously: %w", ref, e)
 	}
 	defer r.Close()
+	return reportPullProgress(r, os.Stderr, ref)
+}
+
+func reportPullProgress(r io.Reader, output io.Writer, ref string) error {
 	d := json.NewDecoder(r)
+	statuses := make(map[string]string)
 	for {
 		var line struct {
+			ID          string `json:"id"`
 			Status      string `json:"status"`
 			Error       string `json:"error"`
 			ErrorDetail struct {
 				Message string `json:"message"`
 			} `json:"errorDetail"`
 		}
-		e = d.Decode(&line)
+		e := d.Decode(&line)
 		if e == io.EOF {
 			return nil
 		}
@@ -84,8 +90,13 @@ func ensureImage(ctx context.Context, cli *client.Client, ref string) error {
 		if line.Error != "" || line.ErrorDetail.Message != "" {
 			return fmt.Errorf("pull image %s: %s %s", ref, line.Error, line.ErrorDetail.Message)
 		}
-		if line.Status != "" {
-			fmt.Fprintln(os.Stderr, line.Status)
+		if line.Status != "" && statuses[line.ID] != line.Status {
+			statuses[line.ID] = line.Status
+			if line.ID == "" {
+				fmt.Fprintln(output, line.Status)
+			} else {
+				fmt.Fprintf(output, "%s: %s\n", line.ID, line.Status)
+			}
 		}
 	}
 }
