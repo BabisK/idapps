@@ -1,0 +1,29 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "golang",
+    "tag": "1.24.6-bullseye"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "args": [
+    "go"
+  ],
+  "workdir": "/src",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/src",
+      "create": false,
+      "readOnly": false
+    }
+  ]
+}

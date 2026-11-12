@@ -1,0 +1,39 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "amazon/aws-cli",
+    "tag": "2.40.1"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/aws",
+      "create": false,
+      "readOnly": false
+    },
+    {
+      "type": "bind",
+      "source": {
+        "base": "home",
+        "path": ".aws"
+      },
+      "target": "/tmp/.aws",
+      "create": true,
+      "readOnly": false
+    }
+  ],
+  "environment": {
+    "AWS_CONFIG_FILE": "/tmp/.aws/config",
+    "AWS_SHARED_CREDENTIALS_FILE": "/tmp/.aws/credentials"
+  }
+}

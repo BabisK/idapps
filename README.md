@@ -104,3 +104,7 @@ does not need Git at runtime. This inference is best effort: shallow checkouts,
 missing VCS metadata, and major-version tags incompatible with the Go module
 path can prevent Go from identifying the last release correctly. Official
 release builds embed the verified tag version.
+
+### Maintaining the catalogue
+
+Each application is defined in `catalogue/<name>/app.json` and follows `catalogue/catalogue.schema.json`; shared catalogue metadata is in `catalogue/metadata.json`. Run `go run ./tools/catalogue-compat` to validate the assembled catalogue against supported release parsers. Renovate tracks image versions in the individual descriptors. Older launcher versions that download the former root catalogue must be upgraded to use this catalogue layout.

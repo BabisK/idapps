@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,9 +70,98 @@ func fetch(ctx context.Context, client *http.Client, version, api, raw string) (
 	if e = json.Unmarshal(b, &head); e != nil || !commitPattern.MatchString(head.SHA) {
 		return nil, fmt.Errorf("invalid main commit response")
 	}
-	b, e = get(strings.TrimRight(raw, "/")+"/"+head.SHA+"/catalogue.json", catalogue.MaxBytes)
+	base := strings.TrimSuffix(api, "/commits/main")
+	type treeEntry struct {
+		Path string `json:"path"`
+		Type string `json:"type"`
+		Mode string `json:"mode"`
+		SHA  string `json:"sha"`
+	}
+	type treeResponse struct {
+		SHA       string      `json:"sha"`
+		Truncated *bool       `json:"truncated"`
+		Tree      []treeEntry `json:"tree"`
+	}
+	readTree := func(url string) (*treeResponse, error) {
+		data, err := get(url, 5<<20)
+		if err != nil {
+			return nil, err
+		}
+		if err = catalogue.CheckJSON(data); err != nil {
+			return nil, err
+		}
+		var tree treeResponse
+		if err = json.Unmarshal(data, &tree); err != nil || !commitPattern.MatchString(tree.SHA) || tree.Truncated == nil || *tree.Truncated {
+			return nil, fmt.Errorf("invalid or incomplete tree")
+		}
+		return &tree, nil
+	}
+	root, e := readTree(base + "/git/trees/" + head.SHA)
 	if e != nil {
-		return nil, fmt.Errorf("download catalogue: %w", e)
+		return nil, fmt.Errorf("download root tree: %w", e)
+	}
+	var subtreeSHA string
+	for _, entry := range root.Tree {
+		if entry.Path != "catalogue" {
+			continue
+		}
+		if subtreeSHA != "" || entry.Type != "tree" || entry.Mode != "040000" || !commitPattern.MatchString(entry.SHA) {
+			return nil, fmt.Errorf("invalid catalogue tree")
+		}
+		subtreeSHA = entry.SHA
+	}
+	if subtreeSHA == "" {
+		return nil, fmt.Errorf("missing catalogue tree")
+	}
+	tree, e := readTree(base + "/git/trees/" + subtreeSHA + "?recursive=1")
+	if e != nil {
+		return nil, fmt.Errorf("download catalogue tree: %w", e)
+	}
+	if tree.SHA != subtreeSHA {
+		return nil, fmt.Errorf("catalogue tree SHA mismatch")
+	}
+	files := map[string][]byte{}
+	dirs := map[string]bool{}
+	var paths []string
+	seen := map[string]bool{}
+	for _, entry := range tree.Tree {
+		if seen[entry.Path] {
+			return nil, fmt.Errorf("duplicate tree path")
+		}
+		seen[entry.Path] = true
+		rel := entry.Path
+		if entry.Type == "tree" && entry.Mode == "040000" && !strings.Contains(rel, "/") {
+			dirs[rel] = true
+			continue
+		}
+		if entry.Type != "blob" || entry.Mode != "100644" {
+			return nil, fmt.Errorf("invalid catalogue tree entry %q", rel)
+		}
+		paths = append(paths, rel)
+	}
+	sort.Strings(paths)
+	total := 0
+	for _, p := range paths {
+		// Validate paths before putting them into a request URL.
+		parts := strings.Split(p, "/")
+		if p != "metadata.json" && p != "catalogue.schema.json" && (len(parts) != 2 || !regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`).MatchString(parts[0]) || parts[1] != "app.json" || !dirs[parts[0]]) {
+			return nil, fmt.Errorf("invalid descriptor path %q", p)
+		}
+		data, err := get(strings.TrimRight(raw, "/")+"/"+head.SHA+"/catalogue/"+p, catalogue.MaxBytes-int64(total))
+		if err != nil {
+			return nil, fmt.Errorf("download %s: %w", p, err)
+		}
+		total += len(data)
+		files[p] = data
+	}
+	for dir := range dirs {
+		if _, ok := files[dir+"/app.json"]; !ok {
+			return nil, fmt.Errorf("missing descriptor for %s", dir)
+		}
+	}
+	b, e = catalogue.Assemble(files, version)
+	if e != nil {
+		return nil, e
 	}
 	c, e := catalogue.Parse(b, version)
 	if e != nil {

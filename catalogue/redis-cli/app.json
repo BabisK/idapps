@@ -1,0 +1,29 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "redis",
+    "tag": "7.0.5-alpine3.16"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "args": [
+    "redis-cli"
+  ],
+  "workdir": "/redis",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/redis",
+      "create": false,
+      "readOnly": false
+    }
+  ]
+}

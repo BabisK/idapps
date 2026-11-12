@@ -24,7 +24,7 @@ func testStore(t GinkgoTInterface) (*Store, *Generation) {
 	s, e := NewStore(storage.Paths{Cache: filepath.Join(dir, "cache", "idapps", "catalogues"), Config: filepath.Join(dir, "config", "idapps"), Bin: filepath.Join(dir, "data", "idapps", "bin")}, "1.0.0")
 	Expect(e).NotTo(HaveOccurred())
 
-	b, e := os.ReadFile("../../catalogue.json")
+	b, e := catalogue.ReadTree("../../catalogue", "1.0.0")
 	Expect(e).NotTo(HaveOccurred())
 
 	h := sha256.Sum256(b)

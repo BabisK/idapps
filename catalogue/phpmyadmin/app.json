@@ -1,0 +1,25 @@
+{
+  "kind": "service",
+  "image": {
+    "repository": "phpmyadmin",
+    "tag": "5.2.3-apache"
+  },
+  "network": "bridge",
+  "user": {
+    "linux": "image",
+    "windows": "image",
+    "darwin": "image"
+  },
+  "containerName": "phpmyadmin",
+  "ports": [
+    {
+      "hostPort": 8082,
+      "containerPort": 80,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    }
+  ],
+  "environment": {
+    "PMA_ARBITRARY": "1"
+  }
+}

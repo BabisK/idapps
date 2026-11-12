@@ -1,43 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/BabisK/idapps/main/catalogue.schema.json",
-  "title": "IDApps application catalogue version 1",
-  "description": "Structural validation only; catalogue-format.md specifies semantic and state-dependent validation.",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "$schema": {
-      "type": "string"
+  "$id": "https://raw.githubusercontent.com/BabisK/idapps/main/catalogue/catalogue.schema.json",
+  "title": "IDApps application descriptor",
+  "description": "Structural validation for an individual application descriptor.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/command"
     },
-    "schemaVersion": {
-      "const": 1,
-      "type": "integer"
-    },
-    "minimumLauncherVersion": {
-      "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
-    },
-    "apps": {
-      "type": "object",
-      "propertyNames": {
-        "$ref": "#/$defs/appName"
-      },
-      "additionalProperties": {
-        "oneOf": [
-          {
-            "$ref": "#/$defs/command"
-          },
-          {
-            "$ref": "#/$defs/service"
-          }
-        ]
-      }
+    {
+      "$ref": "#/$defs/service"
     }
-  },
-  "required": [
-    "schemaVersion",
-    "minimumLauncherVersion",
-    "apps"
   ],
   "$defs": {
     "literal": {

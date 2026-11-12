@@ -1,0 +1,30 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "natsio/nats-box",
+    "tag": "0.20.2"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "entrypoint": [
+    "/usr/local/bin/nats"
+  ],
+  "workdir": "/nats",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/nats",
+      "create": false,
+      "readOnly": false
+    }
+  ],
+  "args": []
+}

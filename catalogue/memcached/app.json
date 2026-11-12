@@ -1,0 +1,22 @@
+{
+  "kind": "service",
+  "image": {
+    "repository": "memcached",
+    "tag": "1.6.17-alpine3.16"
+  },
+  "network": "bridge",
+  "user": {
+    "linux": "image",
+    "windows": "image",
+    "darwin": "image"
+  },
+  "containerName": "memcached",
+  "ports": [
+    {
+      "hostPort": 11211,
+      "containerPort": 11211,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    }
+  ]
+}

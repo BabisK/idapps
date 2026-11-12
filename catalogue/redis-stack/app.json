@@ -1,0 +1,36 @@
+{
+  "kind": "service",
+  "image": {
+    "repository": "redis/redis-stack",
+    "tag": "7.4.0-v3"
+  },
+  "network": "bridge",
+  "user": {
+    "linux": "image",
+    "windows": "image",
+    "darwin": "image"
+  },
+  "containerName": "redis-stack",
+  "ports": [
+    {
+      "hostPort": 6379,
+      "containerPort": 6379,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    },
+    {
+      "hostPort": 8083,
+      "containerPort": 8001,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    }
+  ],
+  "mounts": [
+    {
+      "type": "volume",
+      "name": "redis-stack",
+      "target": "/data",
+      "readOnly": false
+    }
+  ]
+}

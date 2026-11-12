@@ -1,0 +1,30 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "gcr.io/etcd-development/etcd",
+    "tag": "v3.7.3"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "entrypoint": [
+    "/usr/local/bin/etcdctl"
+  ],
+  "workdir": "/etcd",
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "cwd",
+        "path": ""
+      },
+      "target": "/etcd",
+      "create": false,
+      "readOnly": false
+    }
+  ],
+  "args": []
+}

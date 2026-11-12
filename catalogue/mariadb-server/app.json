@@ -1,0 +1,33 @@
+{
+  "kind": "service",
+  "image": {
+    "repository": "mariadb",
+    "tag": "11.3.2-jammy"
+  },
+  "network": "bridge",
+  "user": {
+    "linux": "image",
+    "windows": "image",
+    "darwin": "image"
+  },
+  "containerName": "mariadb",
+  "ports": [
+    {
+      "hostPort": 3306,
+      "containerPort": 3306,
+      "protocol": "tcp",
+      "hostIP": "0.0.0.0"
+    }
+  ],
+  "mounts": [
+    {
+      "type": "volume",
+      "name": "mariadb",
+      "target": "/var/lib/mysql",
+      "readOnly": false
+    }
+  ],
+  "environment": {
+    "MARIADB_ROOT_PASSWORD": "root"
+  }
+}

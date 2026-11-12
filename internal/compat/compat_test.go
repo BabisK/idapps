@@ -2,6 +2,7 @@ package compat
 
 import (
 	"encoding/json"
+	"github.com/BabisK/idapps/internal/catalogue"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,7 +29,7 @@ var _ = Describe("catalogue compatibility with releases", func() {
 	BeforeEach(func() {
 		repo = GinkgoT().TempDir()
 		proposed = filepath.Join(GinkgoT().TempDir(), "catalogue.json")
-		data, err := os.ReadFile("../../catalogue.json")
+		data, err := catalogue.ReadTree("../../catalogue", "1.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(json.Unmarshal(data, &document)).To(Succeed())
 		writeCatalogue()

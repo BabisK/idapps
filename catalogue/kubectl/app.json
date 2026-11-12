@@ -1,0 +1,28 @@
+{
+  "kind": "command",
+  "image": {
+    "repository": "alpine/kubectl",
+    "tag": "1.37.2"
+  },
+  "network": "host",
+  "user": {
+    "linux": "host",
+    "windows": "image",
+    "darwin": "host"
+  },
+  "mounts": [
+    {
+      "type": "bind",
+      "source": {
+        "base": "home",
+        "path": ".kube"
+      },
+      "target": "/.kube",
+      "create": true,
+      "readOnly": false
+    }
+  ],
+  "environment": {
+    "KUBECONFIG": "/.kube/config"
+  }
+}

@@ -8,20 +8,28 @@
   "prHourlyLimit": 0,
   "packageRules": [
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "GitHub Actions dependencies",
       "groupSlug": "github-actions-dependencies",
       "separateMajorMinor": false
     },
     {
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "groupName": "Go dependencies",
       "groupSlug": "go-dependencies",
       "separateMajorMinor": false
     },
     {
-      "matchManagers": ["custom.jsonata"],
-      "matchFileNames": ["catalogue.json"],
+      "matchManagers": [
+        "custom.jsonata"
+      ],
+      "matchFileNames": [
+        "catalogue/*/app.json"
+      ],
       "groupName": "catalogue images",
       "groupSlug": "catalogue-images",
       "separateMajorMinor": false
@@ -31,10 +39,10 @@
     {
       "customType": "jsonata",
       "managerFilePatterns": [
-        "/^catalogue\\.json$/"
+        "/^catalogue/[^/]+/app\\.json$/"
       ],
       "matchStrings": [
-        "apps.*.image.{\"depName\": repository, \"currentValue\": tag, \"currentDigest\": digest}"
+        "image.{\"depName\": repository, \"currentValue\": tag, \"currentDigest\": digest}"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker",
