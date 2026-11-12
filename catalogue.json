@@ -7,7 +7,7 @@
       "kind": "command",
       "image": {
         "repository": "amazon/aws-cli",
-        "tag": "2.39.7"
+        "tag": "2.40.1"
       },
       "network": "host",
       "user": {
@@ -369,7 +369,7 @@
       "kind": "command",
       "image": {
         "repository": "mysql",
-        "tag": "8.0.46"
+        "tag": "26.10.0"
       },
       "network": "host",
       "user": {
@@ -398,7 +398,7 @@
       "kind": "service",
       "image": {
         "repository": "mysql",
-        "tag": "8.0.46"
+        "tag": "26.10.0"
       },
       "network": "bridge",
       "user": {
@@ -431,7 +431,7 @@
       "kind": "command",
       "image": {
         "repository": "mysql",
-        "tag": "8.0.46"
+        "tag": "26.10.0"
       },
       "network": "host",
       "user": {
