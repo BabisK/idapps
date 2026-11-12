@@ -19,6 +19,8 @@ On 2026-11-12, the opt-in Redis integration scenario passed on Ubuntu 26.04.1 LT
 
 These local checks do not cover the full acceptance matrix. Ubuntu 26.04 native engines on both Linux architectures, Windows ARM64, real Docker on macOS Apple silicon, all 22 images, POSIX interactive TTY/resize/cancellation, console restoration, comprehensive fault injection and downloaded release assets remain unverified. WinGet distribution, including installation testing, and Apple Developer ID signing and notarization are deferred. No release or WinGet package was published as part of these checks.
 
+The observed `psql` failure to resolve a host UID without an explicit PostgreSQL username is deferred to a separate spec at the user's direction.
+
 ## Renovate JSONata manager
 
 The catalogue manager uses JSONata to extract image objects independently of field order. Local tests using Renovate 44.226.2 extracted all 22 production images and exercised its replacement function against temporary files. Tag-only and digest-only updates passed, as did combined tag-and-digest updates in four of six field orders and selected repeated-image cases. Combined tag-and-digest updates failed with `update-failure` when `digest` was the first image field. This limitation is accepted for now; an actual hosted Renovate update has not been verified. The earlier Go regex extraction test was removed because it does not exercise JSONata.

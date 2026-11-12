@@ -46,19 +46,19 @@ context:
 - `_bmad-output/specs/spec-native-launcher/` contains approved contract, machine-readable schema and 22-app example; carry it into the implementation commit.
 - Root app wrappers, `lib/`, `powershell/` and `tests/powershell-tests.ps1` supply the baseline only; remove the app wrappers and wrapper-specific tests after porting.
 - `README.md`, `AGENTS.md`, `renovate.json`, `.github/workflows/renovate.yml` describe existing usage and automation; preserve Renovate scheduling/app credentials and dashboard setting.
-- `/usr/bin/go` is Go 1.26.8; the repository currently has a root file named `go`. Windows PowerShell 5.1 and PowerShell 7 are available; the Linux Docker socket is absent.
+- The former root wrappers and PowerShell scripts have been removed; `main.go`, `cmd/` and `internal/` contain the native implementation. See `../../docs/verification.md` for tested environments and remaining gaps.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `go.mod`, `go.sum`, `main.go`, `cmd/` — establish the native entry point, version, dispatch and platform builds.
-- [ ] `catalogue.json`, `catalogue.schema.json`, `internal/catalogue/` — publish the approved data/schema and implement strict structural, semantic and version validation.
-- [ ] `internal/storage/`, `internal/update/` — implement OS paths, durable identity/locks, HTTPS pinned-commit fetching, journalled reconciliation and fault recovery.
-- [ ] `internal/engine/`, `internal/terminal/` — implement local Docker API selection, command streaming, TTY handling, service ownership/lifecycle and recorded-resource recovery.
-- [ ] `internal/*/*_test.go`, `tests/` — cover catalogue, paths, updates, failures, dispatch, fake Docker API, streams, lifecycle and platform-specific behavior.
-- [ ] `.github/workflows/`, `renovate.json` — add CI/release builds, checksums and Windows executable verification; defer WinGet distribution and macOS signing/notarization; discover every embedded image without changing existing Renovate policy.
-- [ ] `README.md`, `AGENTS.md`, root wrappers, `lib/`, `powershell/` — document migration and remove superseded app scripts and wrapper-specific tests.
-- [ ] `_bmad-output/specs/spec-native-launcher/` — retain approved specification and decision log alongside implementation.
+- [x] `go.mod`, `go.sum`, `main.go`, `cmd/` — establish the native entry point, version, dispatch and platform builds.
+- [x] `catalogue.json`, `catalogue.schema.json`, `internal/catalogue/` — publish the approved data/schema and implement strict structural, semantic and version validation.
+- [x] `internal/storage/`, `internal/update/` — implement OS paths, durable identity/locks, HTTPS pinned-commit fetching, journalled reconciliation and fault recovery.
+- [x] `internal/engine/` — implement local Docker API selection, command streaming, TTY handling, service ownership/lifecycle and recorded-resource recovery.
+- [x] `internal/*/*_test.go`, `cmd/*_test.go` — cover catalogue, paths, updates, failures, dispatch, fake Docker API, streams, lifecycle and platform-specific behavior; the coverage is not exhaustive, as recorded below.
+- [x] `.github/workflows/`, `renovate.json` — add CI/release builds, checksums and Windows executable verification; defer WinGet distribution and macOS signing/notarization; discover embedded images using JSONata.
+- [x] `README.md`, `AGENTS.md`, root wrappers, `lib/`, `powershell/` — document migration and remove superseded app scripts and wrapper-specific tests.
+- [x] `_bmad-output/specs/spec-native-launcher/` — retain approved specification and decision log alongside implementation.
 
 **Acceptance Criteria:**
 - Given a supported system, when a user downloads a release and runs `idapps update`, then every catalogue app has a native link and direct dispatch works without Docker CLI.
@@ -77,10 +77,13 @@ context:
 
 ## Spec Change Log
 
+- The user deferred the `psql` host-user lookup failure to a separate spec. Its resolution is outside this implementation record.
+- Automated tests remain offline; real-engine and image checks are manual, and unavailable checks remain documented as verification gaps. WinGet distribution and Apple signing/notarization are deferred.
+
 ## Review Triage Log
 
 ## Verification
 
-- `/usr/bin/go test ./...` and `/usr/bin/go vet ./...` pass; cross-compile all five approved targets.
-- Validate the production catalogue and test invalid schemas, duplicate keys, reserved names and journal failures.
-- Run available real Docker and Windows PowerShell checks; document exact versions and untested Ubuntu 26.04, ARM64 or macOS Docker configurations. Use hosted `windows-2025` and `macos-26` for native tests; WinGet distribution and Apple Developer signing/notarization are deferred.
+- Hosted native launcher and fake-API checks passed on Ubuntu 26.04 amd64/arm64, Windows amd64 and macOS arm64 in [run 43247514060](https://github.com/BabisK/idapps/actions/runs/43247514060). The offline Go suite, race-enabled engine suite and vet have also passed locally; real Docker Redis lifecycle checks passed on Windows and Linux/WSL2 with Docker Desktop. See `../../docs/verification.md` for dates, versions and limits.
+- **Remaining gaps:** Real Docker on native Ubuntu amd64/arm64 and Apple-silicon macOS; Windows ARM64 preview; execution of all catalogue images on both Linux-container architectures; complete native terminal, stream, mount and recovery coverage; and downloaded release-asset verification. Manual checks remain outstanding when suitable environments and images become available.
+- **Known deferred items:** PostgreSQL host-user lookup will be handled in a separate spec; Renovate's JSONata digest-first combined update limitation is accepted for now; WinGet distribution and Apple Developer signing/notarization are deferred. Real Docker behavior when SIGINT races with an in-flight start is recorded in `deferred-work.md`.
