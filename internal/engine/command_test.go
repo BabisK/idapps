@@ -659,3 +659,22 @@ var _ = Describe("Docker image availability", func() {
 		})
 	})
 })
+
+var _ = Describe("image pull progress", func() {
+	When("Docker sends repeated updates for multiple layers", func() {
+		It("reports each layer's status changes without repeating progress events", func() {
+			stream := strings.Join([]string{
+				`{"status":"Downloading","id":"layer-a"}`,
+				`{"status":"Downloading","id":"layer-b"}`,
+				`{"status":"Downloading","id":"layer-a","progressDetail":{"current":10}}`,
+				`{"status":"Extracting","id":"layer-a"}`,
+				`{"status":"Downloading","id":"layer-b","progressDetail":{"current":20}}`,
+				`{"status":"Pull complete","id":"layer-a"}`,
+				`{"status":"Status: Downloaded newer image"}`,
+			}, "\n")
+			var output bytes.Buffer
+			Expect(reportPullProgress(strings.NewReader(stream), &output, "example:1")).To(Succeed())
+			Expect(output.String()).To(Equal("layer-a: Downloading\nlayer-b: Downloading\nlayer-a: Extracting\nlayer-a: Pull complete\nStatus: Downloaded newer image\n"))
+		})
+	})
+})
