@@ -6,6 +6,27 @@
     ":disableDependencyDashboard"
   ],
   "prHourlyLimit": 0,
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions dependencies",
+      "groupSlug": "github-actions-dependencies",
+      "separateMajorMinor": false
+    },
+    {
+      "matchManagers": ["gomod"],
+      "groupName": "Go dependencies",
+      "groupSlug": "go-dependencies",
+      "separateMajorMinor": false
+    },
+    {
+      "matchManagers": ["custom.jsonata"],
+      "matchFileNames": ["catalogue.json"],
+      "groupName": "catalogue images",
+      "groupSlug": "catalogue-images",
+      "separateMajorMinor": false
+    }
+  ],
   "customManagers": [
     {
       "customType": "jsonata",
