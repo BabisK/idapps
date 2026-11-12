@@ -1,8 +1,0 @@
-#!/bin/sh
-
-set -e
-
-IMAGE_NAME=mysql
-IMAGE_VERSION=8.0.46-debian
-
-docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/mysql -w /mysql $IMAGE_NAME:$IMAGE_VERSION mysqldump "$@"

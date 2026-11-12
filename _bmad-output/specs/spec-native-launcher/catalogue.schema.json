@@ -1,0 +1,418 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/BabisK/idapps/main/catalogue.schema.json",
+  "title": "IDApps application catalogue version 1",
+  "description": "Structural validation only; catalogue-format.md specifies semantic and state-dependent validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "type": "integer"
+    },
+    "minimumLauncherVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "apps": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/appName"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/command"
+          },
+          {
+            "$ref": "#/$defs/service"
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "minimumLauncherVersion",
+    "apps"
+  ],
+  "$defs": {
+    "literal": {
+      "type": "string",
+      "pattern": "^[^\\u0000]*$"
+    },
+    "appName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+      "not": {
+        "enum": [
+          "idapps",
+          "update",
+          "run",
+          "list",
+          "version",
+          "help",
+          "con",
+          "prn",
+          "aux",
+          "nul",
+          "com1",
+          "com2",
+          "com3",
+          "com4",
+          "com5",
+          "com6",
+          "com7",
+          "com8",
+          "com9",
+          "lpt1",
+          "lpt2",
+          "lpt3",
+          "lpt4",
+          "lpt5",
+          "lpt6",
+          "lpt7",
+          "lpt8",
+          "lpt9"
+        ]
+      }
+    },
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[^\\u0000]*$",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "repository",
+        "tag"
+      ]
+    },
+    "bindSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "enum": [
+            "cwd",
+            "home"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[^\\u0000]*$"
+        }
+      },
+      "required": [
+        "base",
+        "path"
+      ]
+    },
+    "bind": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "bind"
+        },
+        "source": {
+          "$ref": "#/$defs/bindSource"
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^/[^\\u0000]*$",
+          "minLength": 1
+        },
+        "create": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "source",
+        "target",
+        "create",
+        "readOnly"
+      ]
+    },
+    "volume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "volume"
+        },
+        "name": {
+          "$ref": "#/$defs/resourceName"
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^/[^\\u0000]*$",
+          "minLength": 1
+        },
+        "readOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "name",
+        "target",
+        "readOnly"
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hostPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "containerPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp"
+          ]
+        },
+        "hostIP": {
+          "enum": [
+            "0.0.0.0",
+            "127.0.0.1"
+          ]
+        }
+      },
+      "required": [
+        "hostPort",
+        "containerPort",
+        "protocol",
+        "hostIP"
+      ]
+    },
+    "user": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "linux": {
+          "enum": [
+            "host",
+            "image"
+          ]
+        },
+        "windows": {
+          "const": "image"
+        },
+        "darwin": {
+          "enum": [
+            "host",
+            "image"
+          ]
+        }
+      },
+      "required": [
+        "linux",
+        "windows",
+        "darwin"
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "command"
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "entrypoint": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/literal"
+          }
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/literal"
+          }
+        },
+        "workdir": {
+          "type": "string",
+          "pattern": "^/[^\\u0000]*$",
+          "minLength": 1
+        },
+        "environment": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/literal"
+          }
+        },
+        "network": {
+          "enum": [
+            "host",
+            "bridge"
+          ]
+        },
+        "user": {
+          "$ref": "#/$defs/user"
+        },
+        "mounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/bind"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "image",
+        "network",
+        "user"
+      ]
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "service"
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "entrypoint": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/literal"
+          }
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/literal"
+          }
+        },
+        "workdir": {
+          "type": "string",
+          "pattern": "^/[^\\u0000]*$",
+          "minLength": 1
+        },
+        "environment": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/literal"
+          }
+        },
+        "network": {
+          "enum": [
+            "host",
+            "bridge"
+          ]
+        },
+        "user": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "linux": {
+              "const": "image"
+            },
+            "windows": {
+              "const": "image"
+            },
+            "darwin": {
+              "const": "image"
+            }
+          },
+          "required": [
+            "linux",
+            "windows",
+            "darwin"
+          ]
+        },
+        "mounts": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/bind"
+              },
+              {
+                "$ref": "#/$defs/volume"
+              }
+            ]
+          }
+        },
+        "containerName": {
+          "$ref": "#/$defs/resourceName"
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/port"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "image",
+        "network",
+        "user",
+        "containerName",
+        "ports"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "network": {
+                "const": "host"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "ports": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

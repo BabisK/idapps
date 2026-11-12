@@ -1,15 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommits", ":disableDependencyDashboard"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":disableDependencyDashboard"
+  ],
   "prHourlyLimit": 0,
   "customManagers": [
     {
-      "customType": "regex",
-      "managerFilePatterns": ["/^[^/]+$/"],
-      "matchStrings": [
-        "IMAGE_NAME=(?<depName>[^\\s]+)\\r?\\nIMAGE_VERSION=(?<currentValue>[^\\s]+)"
+      "customType": "jsonata",
+      "managerFilePatterns": [
+        "/^catalogue\\.json$/"
       ],
-      "datasourceTemplate": "docker"
+      "matchStrings": [
+        "apps.*.image.{\"depName\": repository, \"currentValue\": tag, \"currentDigest\": digest}"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "fileFormat": "json"
     }
   ]
 }

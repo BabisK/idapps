@@ -1,8 +1,0 @@
-#!/bin/sh
-
-set -e
-
-IMAGE_NAME=postgres
-IMAGE_VERSION=15.1-alpine3.16
-
-docker run --rm -it --user "$(id -u)":"$(id -g)" --net=host -v "$(pwd)":/postgres -w /postgres $IMAGE_NAME:$IMAGE_VERSION pg_dump "$@"

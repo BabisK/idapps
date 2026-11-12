@@ -1,117 +1,106 @@
 # Instant Docker Apps
 
-## Description
+IDApps runs developer tools and short-lived services in local Docker containers through one native launcher. The release workflow can build candidate assets and, when explicitly requested, publish them against a matching existing version tag. Platform and image compatibility verification remains incomplete; see [the verification record](docs/verification.md).
 
-Instant Docker Apps is a collection of developer oriented, opinionated, portable, self-cleaning scripts to execute
-common applications (databases, CLIs, tools, management consoles etc).
+The launcher uses the local Docker Engine API and Linux containers. It does not
+need the Docker CLI, Git, Go or a shell runtime after installation. Remote Docker
+contexts are rejected. Commands use host networking; Docker Desktop must support
+and have host networking enabled. Services publish ports on all interfaces by
+default. These applications and their default passwords are for local development, not production.
 
-### Developer oriented
+Docker selection honors `DOCKER_CONTEXT`, then `DOCKER_HOST`, then the active
+Docker context; only local sockets and pipes are supported. `DOCKER_CONFIG` can
+select the Docker configuration directory. IDApps uses these environment
+variables and the platform directory settings below; it has no separate settings file.
 
-The target user group are definitely developers and devops engineers. While filling these two roles, I frequently need
-to run a database to test an app, a cli to configure a cloud etc. and I dislike installing single use stuff on my
-laptop. So, for several years I've been using Docker, but I constantly find myself reading the same docs in DockerHub as
-I don't remember parameters.
+Download the appropriate binary and SHA-256 checksums from the project's release assets, verify the checksum, place the binary in the app-bin directory, and on Linux or macOS make it executable (`chmod +x idapps`). Append that directory to PATH, leaving existing
+entries first. On Windows, use `idapps.exe`; Windows must permit creating file
+symlinks, for example through a suitably configured Developer Mode or sufficient
+privilege. The launcher does not change those settings. Windows ARM64 is preview.
 
-IDApps tries to resolve this constant documentation lookup by scripting the launch of these applications.
+The supported builds are Linux amd64/arm64, macOS arm64, and Windows amd64. Windows arm64 is preview. Linux binaries use no libc and Go 1.26 requires Linux kernel 3.2 or newer; WSL 1 is unsupported. macOS requires at least macOS 12 for Go 1.26 and a macOS version supported by Docker Desktop. Windows requires a Microsoft-supported Windows version and a compatible local Docker Desktop installation. Docker Engine API 1.30 or newer is required. Refer to the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements) and Docker's installation requirements for your platform.
 
-**WARNING**: Do not use any of these in production! They are not meant to! There are default values and passwords
-everywhere. The goal of the project is to simplify deploying local, short-lived, development environments.
+The catalogue includes `aws`, `etcdctl`, `go`, `helm`, `helmfile`, `kubectl`, `mysql`, `mysqldump`, `nats`, `pg_dump`, `psql`, and `redis-cli`; services are `etcd`, `mariadb-server`, `memcached`, `mysql-server`, `nats-server`, `pgadmin4`, `phpmyadmin`, `postgres`, `redis`, and `redis-stack`. Every app can also be invoked as `idapps NAME ...` or `idapps run NAME ...`. Services support `start`, `stop`, and `logs [-f] [-t N]`; services with named volumes also support `clean`. Stop retains volumes, and clean refuses resources that are running, in use or unowned.
 
-### Opinionated
+The per-user directories are:
 
-These scripts have minimal configuration parameters, if any, as the goal is not to cover all use cases but to get the
-apps up and running as soon as possible.
+| Purpose | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| App links | `$XDG_DATA_HOME/idapps/bin`, default `~/.local/share/idapps/bin` | `~/Library/Application Support/idapps/bin` | `%LOCALAPPDATA%\idapps\bin` |
+| Cache | `$XDG_CACHE_HOME/idapps/catalogues`, default `~/.cache/idapps/catalogues` | `~/Library/Caches/idapps/catalogues` | `%LOCALAPPDATA%\idapps\cache\catalogues` |
+| Ownership records | `$XDG_CONFIG_HOME/idapps`, default `~/.config/idapps` | `~/Library/Application Support/idapps` | `%APPDATA%\idapps` |
 
-The application in this collection can be categorized in *services* and *commands*. Services are long-running
-systems such as databases. Commands are single shot applications like `psql` or `aws-cli`.
+Linux XDG overrides must be absolute. For a shell session, append the app-bin
+path as appropriate, for example:
 
-In general services use some default user (no security), occupy a host port - either by port-mapping or by using host
-networking (so, you cannot run multiple instances of the service) and use docker volumes for persistence.
-
-In the same spirit, most commands mount the current path in their workspace; `kubectl` mounts only its configuration.
-The POSIX wrappers use the host user and group id to avoid permissions issues and forward all user parameters to the container. So, running a command with IDApps should be
-identical to running it if it was installed.
-
-### Portable
-
-The scripts have only two dependencies; docker and a POSIX shell. So, they should run everywhere: Linux servers, WSL2 in
-laptops, MacOS, a coffee machine and whatnot.
-
-### Self-cleaning
-
-Don't you hate it when your disk fills up with stopped containers? I do too. All scripts try their best to clean up
-after themselves.
-
-## Installation
-
-1. Clone/download-and-extract this repository somewhere in your system.
-2. Add the root folder of the repository in your path (e.g. export PATH=$PATH:$PWD)
-3. Ready!
-
-## Common interface
-
-Most services have 3 execution targets:
-
-1. `start`: This should start the service. This is the default target, so if not target is provided, this will be 
-executed
-2. `stop`: This should stop the service and remove the container. The persistent storage remains intact, so the next
-time you start it, it will pick it up and use it.
-3. `clean`: This should remove the persistence storage. If you messed up and need to start over, this is the target to
-use.
-## Windows PowerShell
-
-The `powershell` directory provides Windows PowerShell 5.1 and PowerShell 7
-entry points. Install Docker Desktop with Linux containers enabled, start its
-engine, and clone or extract the entire repository. In PowerShell, append the
-entry-point directory to your PATH (replace the path with your checkout):
-
-```powershell
-$env:PATH += ';C:\path\to\idapps\powershell'
-psql --version
+```sh
+export PATH="$PATH:${XDG_DATA_HOME:-$HOME/.local/share}/idapps/bin"
+idapps update
+idapps list
+idapps postgres start
+idapps psql -h localhost -U postgres
+idapps postgres logs -f -t 50
+idapps postgres stop
+idapps postgres clean
 ```
 
-Add the PATH line to your PowerShell profile to keep it for future sessions.
-Your execution policy must allow local scripts; for example, an administrator
-may configure `RemoteSigned` for your account. Files downloaded from the web
-may need to be unblocked. Use `Get-Command psql -All` to inspect resolution.
-Aliases and functions take precedence; an executable earlier in PATH also wins.
-Invoke the script by full path to select IDApps in case of a conflict:
+In PowerShell, append the app-bin directory and update:
 
 ```powershell
-& 'C:\path\to\idapps\powershell\psql.ps1' --version
-& 'C:\path\to\idapps\powershell\postgres.ps1' start
-& 'C:\path\to\idapps\powershell\postgres.ps1' logs -f -t 50
-& 'C:\path\to\idapps\powershell\postgres.ps1' stop
-& 'C:\path\to\idapps\powershell\postgres.ps1' clean
+$env:PATH += ";$env:LOCALAPPDATA\idapps\bin"
+idapps.exe update
+idapps.exe psql --version
 ```
 
-The clients use Docker host networking as the shell wrappers do. On Docker
-Desktop this requires a version supporting host networking and enabling it in
-Settings > Resources > Network; restart Docker Desktop after changing it.
-With host networking enabled, for example, start `postgres`, then connect with
-`psql -h localhost -U postgres` (password `postgres`). Published service ports
-are accessible on localhost. Host networking has Docker Desktop limitations;
-consult Docker's host networking documentation for your platform.
+The Windows assets are standalone portable executables; WinGet distribution is deferred. An app link such as `psql.exe` selects the app when it
+is not shadowed by another alias, function or executable. Use `idapps psql`,
+`idapps run psql` or the full launcher/link path to select IDApps explicitly.
+The commands after the app name are forwarded as received by the launcher.
+PowerShell may transform native arguments before the process starts. Windows
+PowerShell 5.1 can also transform binary output in pipelines and redirection;
+for binary exports use the tool's file option on a mounted directory, such as
+`idapps pg_dump -f /postgres/export.dump ...`.
 
-PowerShell mounts the current filesystem directory and applicable configuration
-under your Windows home directory, including `.aws` and `.kube`. Docker Desktop
-must have access to those paths; credential helpers or paths referenced inside a
-configuration file must also be available inside the container. Unlike POSIX
-wrappers, Windows clients run as the image's default user because Windows has no
-portable POSIX UID/GID. Files created in bind mounts may therefore have different
-ownership. TTY allocation is omitted for redirected input or output, allowing
-pipelines; terminal behavior depends on the host and container application.
-Images and service credentials remain intended for local development only.
+Replace the binary in place when upgrading. If it moves, run the new binary by
+full path with `update` to reconcile its owned links. Updating downloads only
+catalogue definitions and changes owned links; it does not replace the binary,
+restart services or delete data. Removing the disposable catalogue cache requires
+another `idapps update` before starting apps. Configuration records must remain
+in place for ownership and recovery; retired services can be managed by their
+explicit launcher name. Existing unowned containers and volumes are not adopted
+or migrated, and name conflicts must be resolved by the user.
 
-Run the mock checks in either PowerShell version with
-`powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\powershell-tests.ps1`
-(or `pwsh` in place of `powershell`). The checks do not replace real Docker
-connectivity and interactive terminal tests. Development verification used Windows
-PowerShell 5.1.26100.9818 and PowerShell 7.6.9 on Windows build 26300 with a
-mock Docker executable, and a Redis service and client connection on Docker
-Desktop engine 29.9.3 using PowerShell 5.1, including an interactive Redis
-client session. Other supported Windows and Docker versions have not been verified
-in this environment.
+Users of an old checkout should replace its root and `powershell` PATH entries
+with the native app-bin entry, keeping the order of unrelated entries. The launcher does not edit profiles or delete old installations. On
+macOS, Developer ID signing and notarization are deferred. Current candidate artifacts are not Developer ID signed or notarized, and Gatekeeper may prevent them from opening. Follow the operating system's first-launch guidance; do not disable Gatekeeper. Linux releases are built
+without libc dependencies; actual OS, Docker, terminal, image and platform
+compatibility must be verified on the target system before release.
 
-PowerShell pipelines transmit text rather than raw bytes, so binary input is not
-guaranteed to survive a pipeline unchanged.
+## Release maintenance
+
+The manually dispatched `build release assets` workflow builds the five supported targets and generates SHA-256 checksums for the final binaries. It uploads the candidate assets, checksum file, license and README as a workflow artifact. Apple Developer ID signing and notarization are deferred; the workflow does not require Apple credentials.
+
+Before publishing, complete the native platform, image and release checks listed in the [verification record](docs/verification.md). Run the workflow on the existing `vMAJOR.MINOR.PATCH` tag, provide the same version without `v`, and explicitly enable its `publish` input. The publication job verifies the tag, commit and checksums and creates a GitHub Release; it does not publish a WinGet package. A run with `publish` disabled only produces workflow artifacts.
+
+The catalogue uses `alpine/kubectl:1.37.2`. Kubernetes supports kubectl within one minor version of the API server; verify your cluster version before use.
+
+## Development testing
+
+Go tests use Ginkgo v2 and Gomega. Run the suites with `go test ./...`; use `go test -v ./... -args '-ginkgo.v'` for individual behavior descriptions. Tests requiring a local Docker engine are opt-in; see [the verification record](docs/verification.md).
+
+Docker API tests use GoMock with the Docker client's HTTP transport. Regenerate
+the transport mock with `go generate ./internal/engine` after changing its interface.
+
+`idapps version` reports the release version or, for development builds, the
+last release inferred from Go build metadata plus the Git commit and an optional
+`dirty` marker (for example `1.2.3+abc123.dirty`). Before the first release the
+baseline is `0.0.0`. Catalogue minimum versions use Semantic Versioning 2.0.0;
+build metadata does not affect precedence. Thus a pre-release build is older
+than the corresponding final release. The current catalogue requires `0.0.0`,
+so builds before the first release tag can activate it.
+
+Plain `go build` derives version information from Go's embedded metadata; it
+does not need Git at runtime. This inference is best effort: shallow checkouts,
+missing VCS metadata, and major-version tags incompatible with the Go module
+path can prevent Go from identifying the last release correctly. Official
+release builds embed the verified tag version.
