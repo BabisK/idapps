@@ -2,7 +2,7 @@
 title: 'Native Go launcher and catalogue'
 type: 'feature'
 created: '2026-11-10'
-status: 'in-progress'
+status: 'done'
 baseline_commit: 'cdcc38455dd913e481d992ddafb9d776d6957f0c'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -84,6 +84,13 @@ context:
 
 ## Verification
 
+- **Acceptance assessment (2026-11-12, commit `b8ad8c0fb7ee6a295221fef1bba01eca2e00594b`):**
+  - Installation and dispatch: native CI and offline executable/update tests cover installed links and direct dispatch; downloaded release assets have not been verified.
+  - Safety and recovery: automated tests cover invalid catalogues, transaction failures, ownership checks and preservation of foreign paths/resources. They do not establish every crash or interference scenario on every platform.
+  - Runtime and lifecycle: fake-engine tests cover the catalogue's command and service requests, arguments, streams, exit status and lifecycle; Redis lifecycle also passed against local Docker Desktop on Linux/WSL2 and Windows. Full real-engine and image coverage remains open; the PostgreSQL username issue is deferred as agreed.
+  - Catalogue-only changes: update tests cover additions, removals, changed images, unchanged launcher and retained service records; they do not establish every real-engine combination.
+  - Release/platform evidence: all five targets built locally with `CGO_ENABLED=0` and their locally generated checksums verified. Hosted native checks and remaining release, platform and manual verification gaps are recorded below and in `../../docs/verification.md`.
+- At that commit, `go test -race ./...` and `go vet ./...` passed with network module lookups disabled. The cached-image Redis integration scenario passed on Ubuntu 26.04.1 under WSL2 with Docker Desktop Engine 29.9.3/API 1.56. Cross-compilation and checksums do not establish native execution or published-asset integrity.
 - Hosted native launcher and fake-API checks passed on Ubuntu 26.04 amd64/arm64, Windows amd64 and macOS arm64 in [run 43247514060](https://github.com/BabisK/idapps/actions/runs/43247514060). The offline Go suite, race-enabled engine suite and vet have also passed locally; real Docker Redis lifecycle checks passed on Windows and Linux/WSL2 with Docker Desktop. See `../../docs/verification.md` for dates, versions and limits.
 - **Remaining gaps:** Real Docker on native Ubuntu amd64/arm64 and Apple-silicon macOS; Windows ARM64 preview; execution of all catalogue images on both Linux-container architectures; complete native terminal, stream, mount and recovery coverage; and downloaded release-asset verification. Manual checks remain outstanding when suitable environments and images become available.
 - **Known deferred items:** PostgreSQL host-user lookup will be handled in a separate spec; Renovate's JSONata digest-first combined update limitation is accepted for now; WinGet distribution and Apple Developer signing/notarization are deferred. Real Docker behavior when SIGINT races with an in-flight start is recorded in `deferred-work.md`.

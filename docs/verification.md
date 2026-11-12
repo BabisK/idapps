@@ -2,6 +2,8 @@
 
 ## Hosted native verification
 
+On 2026-11-12, local verification at commit `b8ad8c0fb7ee6a295221fef1bba01eca2e00594b` passed `go test -race ./...` and `go vet ./...` with module network access disabled. All five supported/preview targets built with `CGO_ENABLED=0`, and their locally generated checksums verified. The cached-image Redis integration scenario also passed on Ubuntu 26.04.1 WSL2 amd64 with Docker Desktop Engine 29.9.3/API 1.56. These local assets are not downloaded release artifacts, and cross-compilation does not verify native execution.
+
 The GitHub Actions run for PR #20, commit `6b9f9878d9de45b8a511d5097ad4c72d458a88f0`, passed the native launcher jobs on `ubuntu-26.04` amd64, `ubuntu-26.04-arm` arm64, `macos-26` arm64 and `windows-2025` amd64, as well as the verify and Renovate jobs: [run 43247514060](https://github.com/BabisK/idapps/actions/runs/43247514060). These are native launcher and fake-API checks; they do not verify real Docker engines or image compatibility. Windows ARM64 and the separate real-engine checks remain gaps.
 
 On 2026-11-12, the opt-in Redis integration scenario passed on Ubuntu 26.04.1 LTS under WSL2 amd64 with Docker Desktop 4.99.0, Engine 29.9.3, API 1.56 and Linux amd64 containers. It used an already cached Redis image and isolated test-owned resources, checked client access, refused cleanup while running, and verified data persistence across restart. This is WSL2 with Docker Desktop, not a native Ubuntu Docker Engine result. The initial attempt failed because the test launcher was named `idapps-spec-verification`; repeating with the required `idapps` basename passed.
