@@ -151,6 +151,26 @@ func commandFailure(ctx context.Context, err error) (int, error) {
 	return 125, err
 }
 
+// removeCommandContainer tolerates Docker's concurrent automatic removal.
+func removeCommandContainer(ctx context.Context, cli *client.Client, id string) error {
+	for {
+		err := cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
+		if err == nil || errdefs.IsNotFound(err) {
+			return nil
+		}
+		if !errdefs.IsConflict(err) || !strings.Contains(strings.ToLower(err.Error()), "removal of container") || !strings.Contains(strings.ToLower(err.Error()), "is already in progress") {
+			return err
+		}
+		timer := time.NewTimer(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("container removal still in progress: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
 // RunCommand runs one ephemeral command, preserving native argv and non-TTY streams.
 func RunCommand(ctx context.Context, a catalogue.App, args []string) (int, error) {
 	stdin, stdout, stderr := os.Stdin, os.Stdout, os.Stderr
@@ -197,7 +217,7 @@ func RunCommand(ctx context.Context, a catalogue.App, args []string) (int, error
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := cli.ContainerRemove(cleanupCtx, created.ID, container.RemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
+		if err := removeCommandContainer(cleanupCtx, cli, created.ID); err != nil {
 			fmt.Fprintf(stderr, "could not remove command container %s: %v\n", created.ID, err)
 		}
 	}()

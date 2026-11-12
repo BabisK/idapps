@@ -598,6 +598,37 @@ func dockerClient(transport http.RoundTripper) *client.Client {
 	return cli
 }
 
+var _ = Describe("cleanup of a command container", func() {
+	var transport *MockRoundTripper
+	var cli *client.Client
+	BeforeEach(func() {
+		transport = NewMockRoundTripper(gomock.NewController(GinkgoT()))
+		cli = dockerClient(transport)
+		DeferCleanup(cli.Close)
+	})
+	When("Docker is already removing the container", func() {
+		It("waits until the container is gone", func() {
+			gomock.InOrder(
+				transport.EXPECT().RoundTrip(dockerRequest("DELETE", "/containers/owned")).Return(dockerResponse(http.StatusConflict, `{"message":"removal of container owned is already in progress"}`), nil),
+				transport.EXPECT().RoundTrip(dockerRequest("DELETE", "/containers/owned")).Return(dockerResponse(http.StatusNotFound, `{"message":"No such container"}`), nil),
+			)
+			Expect(removeCommandContainer(context.Background(), cli, "owned")).To(Succeed())
+		})
+		It("reports when removal does not finish before the deadline", func() {
+			transport.EXPECT().RoundTrip(dockerRequest("DELETE", "/containers/owned")).Return(dockerResponse(http.StatusConflict, `{"message":"removal of container owned is already in progress"}`), nil).AnyTimes()
+			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+			defer cancel()
+			Expect(removeCommandContainer(ctx, cli, "owned")).To(MatchError(ContainSubstring("container removal still in progress")))
+		})
+	})
+	When("Docker reports a different conflict", func() {
+		It("returns the error without retrying", func() {
+			transport.EXPECT().RoundTrip(dockerRequest("DELETE", "/containers/owned")).Return(dockerResponse(http.StatusConflict, `{"message":"another conflict"}`), nil)
+			Expect(removeCommandContainer(context.Background(), cli, "owned")).To(MatchError(ContainSubstring("another conflict")))
+		})
+	})
+})
+
 var _ = Describe("Docker API compatibility", func() {
 	DescribeTable("checks the negotiated API before allowing engine use", func(version string, supported bool) {
 		transport := NewMockRoundTripper(gomock.NewController(GinkgoT()))
