@@ -27,7 +27,6 @@ const maxExpandedBytes = 256 << 20
 type Generation struct {
 	Commit, SHA256 string
 	Bytes          []byte
-	Catalogue      *catalogue.Catalogue
 }
 
 func Fetch(ctx context.Context, version string) (*Generation, error) {
@@ -80,12 +79,12 @@ func fetch(ctx context.Context, client *http.Client, version, api, archive strin
 	if err != nil {
 		return nil, fmt.Errorf("download archive: %w", err)
 	}
-	c, err := parseArchive(b, version)
+	_, err = parseArchive(b, version)
 	if err != nil {
 		return nil, err
 	}
 	sum := sha256.Sum256(b)
-	return &Generation{head.SHA, hex.EncodeToString(sum[:]), b, c}, nil
+	return &Generation{head.SHA, hex.EncodeToString(sum[:]), b}, nil
 }
 
 // parseArchive validates paths and entry types globally, and reads only catalogue files.
@@ -137,9 +136,6 @@ func parseArchiveMode(data []byte, version string, verifyUnrelated bool) (*catal
 			return nil, fmt.Errorf("archive expanded size limit exceeded")
 		}
 		expanded += f.UncompressedSize64
-		if expanded > maxExpandedBytes {
-			return nil, fmt.Errorf("archive expanded size limit exceeded")
-		}
 		if verifyUnrelated && !f.FileInfo().IsDir() && (len(parts) < 2 || parts[1] != "catalogue" || (len(parts) == 3 && parts[2] == "schema_embed.go")) {
 			r, err := f.Open()
 			if err != nil {

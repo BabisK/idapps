@@ -4,7 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,7 +79,12 @@ var _ = Describe("fetching a pinned catalogue archive", func() {
 		g, err := run()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(g.Commit).To(Equal(sha))
-		Expect(g.Catalogue.Apps).To(HaveLen(22))
+		Expect(g.Bytes).To(Equal(body))
+		sum := sha256.Sum256(body)
+		Expect(g.SHA256).To(Equal(hex.EncodeToString(sum[:])))
+		parsed, err := parseArchive(g.Bytes, "1.0.0")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(parsed.Apps).To(HaveLen(22))
 		Expect(requests).To(Equal([]string{"/main", "/" + sha}))
 	})
 	DescribeTable("rejects invalid archives", func(mutate func()) { mutate(); g, err := run(); Expect(g).To(BeNil()); Expect(err).To(HaveOccurred()) },
@@ -149,6 +156,17 @@ var _ = Describe("archive safety and HTTP failures", func() {
 		Expect(i).To(BeNumerically(">=", 0))
 		binary.LittleEndian.PutUint32(b[i+24:], maxExpandedBytes+1)
 		_, err := parseArchive(b, "1.0.0")
+		Expect(err).To(MatchError(ContainSubstring("expanded size")))
+	})
+	It("rejects the combined expanded size of multiple entries", func() {
+		b := archiveFixture(map[string][]byte{"repo/one": []byte("x"), "repo/two": []byte("x")})
+		first := bytes.Index(b, []byte("PK\x01\x02"))
+		second := bytes.Index(b[first+4:], []byte("PK\x01\x02")) + first + 4
+		Expect(first).To(BeNumerically(">=", 0))
+		Expect(second).To(BeNumerically(">", first+4))
+		binary.LittleEndian.PutUint32(b[first+24:], maxExpandedBytes/2+1)
+		binary.LittleEndian.PutUint32(b[second+24:], maxExpandedBytes/2+1)
+		_, err := parseArchiveMode(b, "1.0.0", false)
 		Expect(err).To(MatchError(ContainSubstring("expanded size")))
 	})
 	It("rejects directory entries with payloads", func() {
