@@ -19,9 +19,7 @@ import (
 const MaxBytes = 5 << 20
 
 type Catalogue struct {
-	SchemaVersion          int            `json:"schemaVersion"`
-	MinimumLauncherVersion string         `json:"minimumLauncherVersion"`
-	Apps                   map[string]App `json:"apps"`
+	Apps map[string]App `json:"apps"`
 }
 type Image struct {
 	Repository string `json:"repository"`
@@ -94,8 +92,6 @@ func validateApps(apps map[string]any, schemaVersion int, minimumVersion, launch
 		}
 	}
 	var c Catalogue
-	c.SchemaVersion = 1
-	c.MinimumLauncherVersion = minimumVersion
 	c.Apps = make(map[string]App, len(apps))
 	for name, value := range apps {
 		encoded, err := json.Marshal(value)
@@ -108,14 +104,14 @@ func validateApps(apps map[string]any, schemaVersion int, minimumVersion, launch
 		}
 		c.Apps[name] = app
 	}
-	if !validVersion(c.MinimumLauncherVersion) {
-		return nil, fmt.Errorf("invalid minimum launcher version %q", c.MinimumLauncherVersion)
+	if !validVersion(minimumVersion) {
+		return nil, fmt.Errorf("invalid minimum launcher version %q", minimumVersion)
 	}
 	if !validVersion(launcherVersion) {
 		return nil, fmt.Errorf("invalid launcher version %q", launcherVersion)
 	}
-	if semver.Compare("v"+launcherVersion, "v"+c.MinimumLauncherVersion) < 0 {
-		return nil, fmt.Errorf("catalogue requires launcher %s or newer", c.MinimumLauncherVersion)
+	if semver.Compare("v"+launcherVersion, "v"+minimumVersion) < 0 {
+		return nil, fmt.Errorf("catalogue requires launcher %s or newer", minimumVersion)
 	}
 	containers := map[string]string{}
 	volumes := map[string]string{}
