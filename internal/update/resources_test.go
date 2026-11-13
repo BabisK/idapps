@@ -15,9 +15,7 @@ var _ = Describe("saved service definitions", func() {
 	BeforeEach(func() {
 		var err error
 		store, _ = testStore(GinkgoT())
-		data, err := catalogue.ReadTree("../../catalogue", "1.0.0")
-		Expect(err).NotTo(HaveOccurred())
-		c, err := catalogue.Parse(data, "0.0.0")
+		c, err := catalogue.ReadTree("../../catalogue", "0.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		definition = c.Apps["postgres"]
 	})

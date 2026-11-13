@@ -62,8 +62,7 @@ for binary exports use the tool's file option on a mounted directory, such as
 `idapps pg_dump -f /postgres/export.dump ...`.
 
 Replace the binary in place when upgrading. If it moves, run the new binary by
-full path with `update` to reconcile its owned links. Updating downloads only
-catalogue definitions and changes owned links; it does not replace the binary,
+full path with `update` to reconcile its owned links. Updating downloads a commit-pinned repository ZIP, validates and caches its catalogue, and changes owned links; it does not replace the binary,
 restart services or delete data. Removing the disposable catalogue cache requires
 another `idapps update` before starting apps. Configuration records must remain
 in place for ownership and recovery; retired services can be managed by their
@@ -107,4 +106,4 @@ release builds embed the verified tag version.
 
 ### Maintaining the catalogue
 
-Each application is defined in `catalogue/<name>/app.json` and follows `catalogue/catalogue.schema.json`; shared catalogue metadata is in `catalogue/metadata.json`. Run `go run ./tools/catalogue-compat` to validate the assembled catalogue against supported release parsers. Renovate tracks image versions in the individual descriptors. Older launcher versions that download the former root catalogue must be upgraded to use this catalogue layout.
+Each application is defined in `catalogue/<name>/app.json` and follows `catalogue/catalogue.schema.json`; shared catalogue metadata is in `catalogue/metadata.json`. Run `go run ./tools/catalogue-compat` to validate descriptors and cross-app resource conflicts; pull-request CI runs the same check. Renovate tracks image versions in the individual descriptors.

@@ -24,13 +24,13 @@ func validAppName(name string) bool {
 	return true
 }
 
-// Assemble builds the legacy aggregate from metadata.json and app descriptors.
-// Each input is checked before decoding, so duplicate keys cannot be discarded.
-func Assemble(files map[string][]byte, version string) ([]byte, error) {
-	metadata, ok := files["metadata.json"]
+// ParseTree validates individual descriptors without constructing an aggregate document.
+func ParseTree(files map[string][]byte, version string) (*Catalogue, error) {
+	meta, ok := files["metadata.json"]
 	if !ok {
 		return nil, fmt.Errorf("missing catalogue metadata")
 	}
+	root := map[string]any{}
 	total := 0
 	for name, data := range files {
 		total += len(data)
@@ -41,14 +41,17 @@ func Assemble(files map[string][]byte, version string) ([]byte, error) {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 	}
-	var meta map[string]json.RawMessage
-	if err := json.Unmarshal(metadata, &meta); err != nil || meta == nil {
-		return nil, fmt.Errorf("invalid catalogue metadata")
-	}
-	if len(meta) != 2 || meta["schemaVersion"] == nil || meta["minimumLauncherVersion"] == nil {
+	if err := json.Unmarshal(meta, &root); err != nil || root == nil || len(root) != 2 || root["schemaVersion"] == nil || root["minimumLauncherVersion"] == nil {
 		return nil, fmt.Errorf("invalid catalogue metadata fields")
 	}
-	apps := make(map[string]json.RawMessage)
+	var typedMeta struct {
+		SchemaVersion          int    `json:"schemaVersion"`
+		MinimumLauncherVersion string `json:"minimumLauncherVersion"`
+	}
+	if err := json.Unmarshal(meta, &typedMeta); err != nil {
+		return nil, fmt.Errorf("invalid catalogue metadata: %w", err)
+	}
+	apps := map[string]any{}
 	for name, data := range files {
 		if name == "metadata.json" || name == "catalogue.schema.json" || name == "schema_embed.go" {
 			continue
@@ -57,33 +60,31 @@ func Assemble(files map[string][]byte, version string) ([]byte, error) {
 		if len(parts) != 2 || !appName.MatchString(parts[0]) || parts[1] != "app.json" {
 			return nil, fmt.Errorf("invalid descriptor path %q", name)
 		}
-		if _, exists := apps[parts[0]]; exists {
-			return nil, fmt.Errorf("duplicate app %q", parts[0])
+		var app any
+		if err := json.Unmarshal(data, &app); err != nil {
+			return nil, err
 		}
-		apps[parts[0]] = data
+		apps[parts[0]] = app
 	}
 	if len(apps) == 0 {
 		return nil, fmt.Errorf("catalogue has no descriptors")
 	}
-	aggregate := struct {
-		Schema                 string                     `json:"$schema"`
-		SchemaVersion          json.RawMessage            `json:"schemaVersion"`
-		MinimumLauncherVersion json.RawMessage            `json:"minimumLauncherVersion"`
-		Apps                   map[string]json.RawMessage `json:"apps"`
-	}{"", meta["schemaVersion"], meta["minimumLauncherVersion"], apps}
-	data, err := json.MarshalIndent(aggregate, "", "  ")
+	c, err := validateApps(apps, typedMeta.SchemaVersion, typedMeta.MinimumLauncherVersion, version)
 	if err != nil {
 		return nil, err
 	}
-	data = append(data, '\n')
-	if _, err = Parse(data, version); err != nil {
-		return nil, err
+	for name := range apps {
+		var app App
+		if err := json.Unmarshal(files[name+"/app.json"], &app); err != nil {
+			return nil, err
+		}
+		c.Apps[name] = app
 	}
-	return data, nil
+	return c, nil
 }
 
 // ReadTree reads only regular files and rejects unexpected entries or symlinks.
-func ReadTree(root string, version string) ([]byte, error) {
+func ReadTree(root string, version string) (*Catalogue, error) {
 	files := map[string][]byte{}
 	total := int64(0)
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -145,5 +146,5 @@ func ReadTree(root string, version string) ([]byte, error) {
 			return nil, fmt.Errorf("missing descriptor for %s", d)
 		}
 	}
-	return Assemble(files, version)
+	return ParseTree(files, version)
 }

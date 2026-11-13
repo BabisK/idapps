@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +10,7 @@ import (
 	"fmt"
 	"github.com/BabisK/idapps/internal/catalogue"
 	"github.com/BabisK/idapps/internal/storage"
+	"github.com/BabisK/idapps/internal/testutil"
 	"github.com/BabisK/idapps/internal/update"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -54,8 +57,8 @@ var _ = Describe("The launcher", func() {
 	When("the catalogue is updated", func() {
 		It("installs and repairs links using only mocked HTTP responses", func() {
 			const commit = "0123456789abcdef0123456789abcdef01234567"
-			const treeSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-			entries := []map[string]string{}
+			var archive bytes.Buffer
+			zw := zip.NewWriter(&archive)
 			files := map[string]string{}
 			err := filepath.WalkDir("../catalogue", func(p string, d os.DirEntry, err error) error {
 				if err != nil {
@@ -69,21 +72,25 @@ var _ = Describe("The launcher", func() {
 					return err
 				}
 				rel = filepath.ToSlash(rel)
-				item := map[string]string{"path": rel, "type": "blob", "mode": "100644"}
-				if d.IsDir() {
-					item["type"] = "tree"
-					item["mode"] = "040000"
-				} else {
+				if !d.IsDir() {
 					b, e := os.ReadFile(p)
 					if e != nil {
 						return e
 					}
 					files[rel] = string(b)
+					f, e := zw.Create("repo/catalogue/" + rel)
+					if e != nil {
+						return e
+					}
+					_, e = f.Write(b)
+					if e != nil {
+						return e
+					}
 				}
-				entries = append(entries, item)
 				return nil
 			})
 			Expect(err).NotTo(HaveOccurred())
+			Expect(zw.Close()).To(Succeed())
 			var requests []string
 			invalidTree := false
 			previous := http.DefaultTransport
@@ -94,20 +101,13 @@ var _ = Describe("The launcher", func() {
 				switch req.URL.String() {
 				case "https://api.github.com/repos/BabisK/idapps/commits/main":
 					body = fmt.Sprintf(`{"sha":%q}`, commit)
-				case "https://api.github.com/repos/BabisK/idapps/git/trees/" + commit:
-					body = fmt.Sprintf(`{"sha":%q,"truncated":false,"tree":[{"path":"catalogue","type":"tree","mode":"040000","sha":%q}]}`, commit, treeSHA)
-				case "https://api.github.com/repos/BabisK/idapps/git/trees/" + treeSHA + "?recursive=1":
-					b, err := json.Marshal(map[string]any{"sha": treeSHA, "truncated": invalidTree, "tree": entries})
-					if err != nil {
-						return nil, err
+				case "https://codeload.github.com/BabisK/idapps/zip/" + commit:
+					body = archive.String()
+					if invalidTree {
+						body = "invalid zip"
 					}
-					body = string(b)
 				default:
-					prefix := "https://raw.githubusercontent.com/BabisK/idapps/" + commit + "/catalogue/"
-					if !strings.HasPrefix(req.URL.String(), prefix) {
-						return nil, fmt.Errorf("unexpected request %s", req.URL)
-					}
-					body = files[strings.TrimPrefix(req.URL.String(), prefix)]
+					return nil, fmt.Errorf("unexpected request %s", req.URL)
 				}
 				return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header), Request: req}, nil
 			})
@@ -141,7 +141,7 @@ var _ = Describe("The launcher", func() {
 			target, err := os.Readlink(filepath.Join(paths.Bin, "psql"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(target).To(Equal(executable))
-			Expect(requests).To(HaveLen(3 * (3 + len(files) - 1)))
+			Expect(requests).To(HaveLen(6))
 			invalidTree = true
 			Expect(run([]string{"idapps", "update"})).NotTo(Equal(0))
 			Expect(store.WithLock(context.Background(), func() error {
@@ -225,9 +225,7 @@ var _ = Describe("Cobra app invocation", func() {
 			Entry("app name resembling a flag", []string{"idapps", "run", "--help"}, "linux", "--help", []string{}),
 		)
 		It("supports every catalogue app through all invocation forms", func() {
-			data, err := catalogue.ReadTree("../catalogue", "1.0.0")
-			Expect(err).NotTo(HaveOccurred())
-			catalogue, err := catalogue.Parse(data, "1.0.0")
+			catalogue, err := catalogue.ReadTree("../catalogue", "1.0.0")
 			Expect(err).NotTo(HaveOccurred())
 			args := []string{"", "space value", "--help", "$literal"}
 			for expected := range catalogue.Apps {
@@ -307,11 +305,13 @@ var _ = Describe("executing the installed launcher", Ordered, func() {
 		var err error
 		paths, err = storage.Resolve()
 		Expect(err).NotTo(HaveOccurred())
-		data, err := catalogue.ReadTree("../catalogue", "1.0.0")
-		Expect(err).NotTo(HaveOccurred())
-		c, err := catalogue.Parse(data, "0.0.0")
+		c, err := catalogue.ReadTree("../catalogue", "0.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		apps = c.Apps
+		files, err := testutil.CatalogueFiles("../catalogue")
+		Expect(err).NotTo(HaveOccurred())
+		data, err := testutil.CatalogueArchive(files)
+		Expect(err).NotTo(HaveOccurred())
 		sum := sha256.Sum256(data)
 		g := &update.Generation{Commit: strings.Repeat("a", 40), SHA256: hex.EncodeToString(sum[:]), Bytes: data}
 		store, err := update.NewStore(paths, "0.0.0")

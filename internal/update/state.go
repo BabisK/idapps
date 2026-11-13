@@ -343,7 +343,7 @@ func (s *Store) ActivateWithResult(g *Generation, executable string) (Reconcilia
 	if err != nil {
 		return result, err
 	}
-	c, err := catalogue.Parse(g.Bytes, s.Version)
+	c, err := parseGeneration(g.Bytes, s.Version)
 	if err != nil {
 		return result, err
 	}
@@ -389,7 +389,7 @@ func (s *Store) Activate(g *Generation, executable string) error {
 	if hex.EncodeToString(sum[:]) != g.SHA256 {
 		return fmt.Errorf("catalogue hash mismatch")
 	}
-	c, e := catalogue.Parse(g.Bytes, s.Version)
+	c, e := parseGeneration(g.Bytes, s.Version)
 	if e != nil {
 		return e
 	}
@@ -451,13 +451,8 @@ func (s *Store) Activate(g *Generation, executable string) error {
 			}
 		}
 	}
-	generationPath := filepath.Join(s.Paths.Cache, g.SHA256+".json")
-	cached, readErr := os.ReadFile(generationPath)
-	if info, statErr := os.Lstat(generationPath); statErr == nil && !info.Mode().IsRegular() {
-		return fmt.Errorf("unsafe catalogue path %s", generationPath)
-	} else if statErr != nil && !os.IsNotExist(statErr) {
-		return statErr
-	}
+	generationPath := filepath.Join(s.Paths.Cache, g.SHA256+".zip")
+	cached, readErr := readCache(generationPath, maxArchiveBytes)
 	if readErr != nil && !os.IsNotExist(readErr) {
 		return readErr
 	}
@@ -536,7 +531,8 @@ func (s *Store) Snapshot() (*catalogue.Catalogue, string, error) {
 	if st.Hash == "" {
 		return nil, "", fmt.Errorf("no catalogue installed; run idapps update")
 	}
-	b, e := os.ReadFile(filepath.Join(s.Paths.Cache, st.Hash+".json"))
+
+	b, e := readCache(filepath.Join(s.Paths.Cache, st.Hash+".zip"), maxArchiveBytes)
 	if e != nil {
 		return nil, st.Commit, fmt.Errorf("catalogue cache unavailable; run idapps update: %w", e)
 	}
@@ -544,9 +540,33 @@ func (s *Store) Snapshot() (*catalogue.Catalogue, string, error) {
 	if hex.EncodeToString(sum[:]) != st.Hash {
 		return nil, st.Commit, fmt.Errorf("catalogue cache corrupt; run idapps update")
 	}
-	c, e := catalogue.Parse(b, s.Version)
+	c, e := parseArchiveMode(b, s.Version, false)
 	if e != nil {
 		return nil, st.Commit, fmt.Errorf("cached catalogue invalid: %w", e)
 	}
 	return c, st.Commit, nil
+}
+
+func parseGeneration(b []byte, version string) (*catalogue.Catalogue, error) {
+	return parseArchive(b, version)
+}
+
+func readCache(file string, limit int64) ([]byte, error) {
+	info, err := os.Lstat(file)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > limit {
+		return nil, fmt.Errorf("unsafe or oversized cache file")
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if err == nil && int64(len(b)) > limit {
+		return nil, fmt.Errorf("oversized cache file")
+	}
+	return b, err
 }

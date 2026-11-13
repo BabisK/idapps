@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/BabisK/idapps/internal/catalogue"
+	"github.com/BabisK/idapps/internal/testutil"
 	"net"
 	"os"
 	"os/exec"
@@ -77,17 +77,10 @@ var _ = Describe("A Redis service on a local Docker engine", func() {
 
 			port := listener.Addr().(*net.TCPAddr).Port
 			listener.Close()
-			b, err := catalogue.ReadTree("../../catalogue", "1.0.0")
+			files, err := testutil.CatalogueFiles("../../catalogue")
 			Expect(err).NotTo(HaveOccurred())
-
-			var doc map[string]any
-			{
-				err = json.Unmarshal(b, &doc)
-				Expect(err).NotTo(HaveOccurred())
-			}
-
-			apps := doc["apps"].(map[string]any)
-			server := apps["redis"].(map[string]any)
+			var server map[string]any
+			Expect(json.Unmarshal(files["repo/catalogue/redis/app.json"], &server)).To(Succeed())
 			server["containerName"] = resource
 			for _, entry := range server["mounts"].([]any) {
 				m := entry.(map[string]any)
@@ -98,11 +91,15 @@ var _ = Describe("A Redis service on a local Docker engine", func() {
 			binding := server["ports"].([]any)[0].(map[string]any)
 			binding["hostIP"] = "127.0.0.1"
 			binding["hostPort"] = port
-			doc["apps"] = map[string]any{"redis": server, "redis-cli": apps["redis-cli"]}
-			// This synthetic catalogue tests the engine independently of whether
-			// the launcher was built before the repository's first release tag.
-			doc["minimumLauncherVersion"] = "0.0.0"
-			b, err = json.Marshal(doc)
+			redisData, err := json.Marshal(server)
+			Expect(err).NotTo(HaveOccurred())
+			for name := range files {
+				if strings.HasPrefix(name, "repo/catalogue/") && strings.HasSuffix(name, "/app.json") && name != "repo/catalogue/redis/app.json" && name != "repo/catalogue/redis-cli/app.json" {
+					delete(files, name)
+				}
+			}
+			files["repo/catalogue/redis/app.json"] = redisData
+			b, err := testutil.CatalogueArchive(files)
 			Expect(err).NotTo(HaveOccurred())
 
 			digest := sha256.Sum256(b)
