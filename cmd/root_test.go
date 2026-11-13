@@ -141,7 +141,7 @@ var _ = Describe("The launcher", func() {
 			target, err := os.Readlink(filepath.Join(paths.Bin, "psql"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(target).To(Equal(executable))
-			Expect(requests).To(HaveLen(3 * (3 + len(files))))
+			Expect(requests).To(HaveLen(3 * (3 + len(files) - 1)))
 			invalidTree = true
 			Expect(run([]string{"idapps", "update"})).NotTo(Equal(0))
 			Expect(store.WithLock(context.Background(), func() error {
