@@ -1,16 +1,18 @@
 package update
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/BabisK/idapps/internal/catalogue"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -21,116 +23,202 @@ func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f
 func response(s string) *http.Response {
 	return &http.Response{StatusCode: 200, Status: "200 OK", Body: io.NopCloser(strings.NewReader(s)), Header: make(http.Header)}
 }
+func archiveFixture(files map[string][]byte) []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	for name, data := range files {
+		f, err := w.Create(name)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = f.Write(data)
+		Expect(err).NotTo(HaveOccurred())
+	}
+	Expect(w.Close()).To(Succeed())
+	return buf.Bytes()
+}
 
-var _ = Describe("fetching a pinned catalogue tree", func() {
+var _ = Describe("fetching a pinned catalogue archive", func() {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
-	const treeSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	var entries []map[string]string
-	var files map[string]string
+	var files map[string][]byte
 	var requests []string
-	var override func(*http.Request) *http.Response
-	var client *http.Client
+	var body []byte
 	BeforeEach(func() {
-		entries = nil
-		files = map[string]string{}
+		files = map[string][]byte{}
 		requests = nil
-		override = nil
-		err := filepath.WalkDir("../../catalogue", func(p string, d os.DirEntry, err error) error {
+		Expect(filepath.WalkDir("../../catalogue", func(p string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			if p == "../../catalogue" {
+			if d.IsDir() {
 				return nil
 			}
 			rel, err := filepath.Rel("../../catalogue", p)
 			if err != nil {
 				return err
 			}
-			rel = filepath.ToSlash(rel)
-			item := map[string]string{"path": rel, "type": "blob", "mode": "100644"}
-			if d.IsDir() {
-				item["type"] = "tree"
-				item["mode"] = "040000"
-			} else {
-				b, e := os.ReadFile(p)
-				if e != nil {
-					return e
-				}
-				files[rel] = string(b)
-			}
-			entries = append(entries, item)
-			return nil
-		})
-		Expect(err).NotTo(HaveOccurred())
-		client = &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
-			requests = append(requests, r.URL.RequestURI())
-			if override != nil {
-				if res := override(r); res != nil {
-					return res, nil
-				}
-			}
-			switch r.URL.RequestURI() {
-			case "/main":
-				return response(fmt.Sprintf(`{"sha":%q}`, sha)), nil
-			case "/main/git/trees/" + sha:
-				return response(fmt.Sprintf(`{"sha":%q,"truncated":false,"tree":[{"path":"catalogue","type":"tree","mode":"040000","sha":%q}]}`, sha, treeSHA)), nil
-			case "/main/git/trees/" + treeSHA + "?recursive=1":
-				b, _ := json.Marshal(map[string]any{"sha": treeSHA, "truncated": false, "tree": entries})
-				return response(string(b)), nil
-			}
-			prefix := "/" + sha + "/catalogue/"
-			if strings.HasPrefix(r.URL.Path, prefix) {
-				return response(files[strings.TrimPrefix(r.URL.Path, prefix)]), nil
-			}
-			return nil, fmt.Errorf("unexpected request %s", r.URL)
-		})}
+			files["repo/catalogue/"+filepath.ToSlash(rel)], err = os.ReadFile(p)
+			return err
+		})).To(Succeed())
 	})
 	run := func() (*Generation, error) {
+		client := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+			requests = append(requests, r.URL.Path)
+			if r.URL.Path == "/main" {
+				return response(fmt.Sprintf(`{"sha":%q}`, sha)), nil
+			}
+			if r.URL.Path == "/"+sha {
+				return response(string(body)), nil
+			}
+			return nil, fmt.Errorf("unexpected request")
+		})}
 		return fetch(context.Background(), client, "1.0.0", "https://example.test/main", "https://example.test")
 	}
-	It("resolves main once and fetches the subtree and descriptors at the pinned commit", func() {
+	It("resolves the commit once and downloads its complete archive", func() {
+		body = archiveFixture(files)
 		g, err := run()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(g.Commit).To(Equal(sha))
 		Expect(g.Catalogue.Apps).To(HaveLen(22))
-		Expect(g.SHA256).To(HaveLen(64))
-		Expect(requests[:3]).To(Equal([]string{"/main", "/main/git/trees/" + sha, "/main/git/trees/" + treeSHA + "?recursive=1"}))
-		for _, p := range requests[3:] {
-			Expect(p).To(HavePrefix("/" + sha + "/catalogue/"))
-		}
+		Expect(requests).To(Equal([]string{"/main", "/" + sha}))
 	})
-	DescribeTable("rejects invalid responses without returning a generation", func(path, body, message string, status int) {
-		override = func(r *http.Request) *http.Response {
-			if r.URL.RequestURI() != path {
-				return nil
-			}
-			res := response(body)
-			if status != 0 {
-				res.StatusCode = status
-				res.Status = fmt.Sprintf("%d test", status)
-			}
-			return res
-		}
-		g, err := run()
-		Expect(g).To(BeNil())
-		Expect(err).To(MatchError(ContainSubstring(message)))
-	},
-		Entry("invalid commit", "/main", `{"sha":"../invalid"}`, "commit", 0),
-		Entry("main HTTP failure", "/main", "", "HTTP 503", 503),
-		Entry("root tree HTTP failure", "/main/git/trees/"+sha, "", "HTTP 404", 404),
-		Entry("descriptor HTTP failure", "/"+sha+"/catalogue/psql/app.json", "", "HTTP 404", 404),
-		Entry("oversized descriptor", "/"+sha+"/catalogue/psql/app.json", strings.Repeat("x", catalogue.MaxBytes+1), "size limit", 0),
-		Entry("malformed descriptor", "/"+sha+"/catalogue/psql/app.json", `{"kind":`, "EOF", 0),
-		Entry("duplicate descriptor key", "/"+sha+"/catalogue/psql/app.json", `{"kind":"command","kind":"service"}`, "duplicate", 0),
-		Entry("unsupported schema", "/"+sha+"/catalogue/metadata.json", `{"schemaVersion":2,"minimumLauncherVersion":"0.0.0"}`, "invalid catalogue", 0),
-		Entry("missing root completeness indicator", "/main/git/trees/"+sha, fmt.Sprintf(`{"sha":%q,"tree":[]}`, sha), "incomplete tree", 0),
-		Entry("missing subtree completeness indicator", "/main/git/trees/"+treeSHA+"?recursive=1", fmt.Sprintf(`{"sha":%q,"tree":[]}`, treeSHA), "incomplete tree", 0),
-		Entry("truncated subtree", "/main/git/trees/"+treeSHA+"?recursive=1", fmt.Sprintf(`{"sha":%q,"truncated":true,"tree":[]}`, treeSHA), "incomplete tree", 0),
+	DescribeTable("rejects invalid archives", func(mutate func()) { mutate(); g, err := run(); Expect(g).To(BeNil()); Expect(err).To(HaveOccurred()) },
+		Entry("truncated", func() { body = archiveFixture(files); body = body[:len(body)-8] }),
+		Entry("unsafe path", func() { files["repo/../evil"] = []byte("x"); body = archiveFixture(files) }),
+		Entry("invalid descriptor", func() { files["repo/catalogue/psql/app.json"] = []byte(`{"kind":`); body = archiveFixture(files) }),
+		Entry("missing metadata", func() { delete(files, "repo/catalogue/metadata.json"); body = archiveFixture(files) }),
+		Entry("missing schema", func() { delete(files, "repo/catalogue/catalogue.schema.json"); body = archiveFixture(files) }),
+		Entry("ambiguous root", func() { files["other/foo"] = []byte("x"); body = archiveFixture(files) }),
 	)
-	It("rejects duplicate tree entries", func() {
-		entries = append(entries, entries[0])
-		g, err := run()
-		Expect(g).To(BeNil())
+	It("rejects duplicate paths", func() {
+		var b bytes.Buffer
+		w := zip.NewWriter(&b)
+		for i := 0; i < 2; i++ {
+			f, err := w.Create("repo/catalogue/metadata.json")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = f.Write([]byte("{}"))
+			Expect(err).NotTo(HaveOccurred())
+		}
+		Expect(w.Close()).To(Succeed())
+		body = b.Bytes()
+		_, err := run()
 		Expect(err).To(MatchError(ContainSubstring("duplicate")))
 	})
+})
+
+var _ = Describe("archive safety and HTTP failures", func() {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	It("rejects invalid commit responses and HTTP failures", func() {
+		for _, tc := range []struct {
+			main                      string
+			mainStatus, archiveStatus int
+		}{
+			{`{"sha":"invalid"}`, 200, 200}, {"", 503, 200}, {fmt.Sprintf(`{"sha":%q}`, sha), 200, 404},
+		} {
+			client := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+				res := response(tc.main)
+				res.StatusCode = tc.mainStatus
+				res.Status = fmt.Sprintf("%d test", tc.mainStatus)
+				if r.URL.Path != "/main" {
+					res.StatusCode = tc.archiveStatus
+					res.Status = fmt.Sprintf("%d test", tc.archiveStatus)
+				}
+				return res, nil
+			})}
+			_, err := fetch(context.Background(), client, "1.0.0", "https://example.test/main", "https://example.test")
+			Expect(err).To(HaveOccurred())
+		}
+	})
+	It("rejects oversized commit and archive responses", func() {
+		for _, archive := range []bool{false, true} {
+			client := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+				if r.URL.Path == "/main" && archive {
+					return response(fmt.Sprintf(`{"sha":%q}`, sha)), nil
+				}
+				size := 1 << 20
+				if archive {
+					size = maxArchiveBytes
+				}
+				return response(strings.Repeat("x", size+1)), nil
+			})}
+			_, err := fetch(context.Background(), client, "1.0.0", "https://example.test/main", "https://example.test")
+			Expect(err).To(MatchError(ContainSubstring("size limit")))
+		}
+	})
+	It("rejects advertised expanded sizes beyond the limit", func() {
+		b := archiveFixture(map[string][]byte{"repo/file": []byte("x")})
+		i := bytes.Index(b, []byte("PK\x01\x02"))
+		Expect(i).To(BeNumerically(">=", 0))
+		binary.LittleEndian.PutUint32(b[i+24:], maxExpandedBytes+1)
+		_, err := parseArchive(b, "1.0.0")
+		Expect(err).To(MatchError(ContainSubstring("expanded size")))
+	})
+	It("rejects directory entries with payloads", func() {
+		b := archiveFixture(map[string][]byte{"repo/dir/": nil})
+		i := bytes.Index(b, []byte("PK\x01\x02"))
+		binary.LittleEndian.PutUint32(b[i+24:], 1)
+		_, err := parseArchive(b, "1.0.0")
+		Expect(err).To(MatchError(ContainSubstring("directory has data")))
+	})
+	It("rejects symlinks and file-directory collisions", func() {
+		var buf bytes.Buffer
+		w := zip.NewWriter(&buf)
+		h := &zip.FileHeader{Name: "repo/link"}
+		h.SetMode(os.ModeSymlink | 0777)
+		_, err := w.CreateHeader(h)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(w.Close()).To(Succeed())
+		_, err = parseArchive(buf.Bytes(), "1.0.0")
+		Expect(err).To(MatchError(ContainSubstring("unsafe archive entry")))
+		b := archiveFixture(map[string][]byte{"repo/file": nil, "repo/file/child": nil})
+		_, err = parseArchive(b, "1.0.0")
+		Expect(err).To(MatchError(ContainSubstring("conflicts with directory")))
+	})
+	It("checks unrelated file CRC on update without decompressing it on snapshots", func() {
+		files := map[string][]byte{}
+		Expect(filepath.WalkDir("../../catalogue", func(p string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			rel, e := filepath.Rel("../../catalogue", p)
+			if e != nil {
+				return e
+			}
+			files["repo/catalogue/"+filepath.ToSlash(rel)], e = os.ReadFile(p)
+			return e
+		})).To(Succeed())
+		files["repo/other"] = []byte("content")
+		b := archiveFixture(files)
+		z, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+		Expect(err).NotTo(HaveOccurred())
+		for _, f := range z.File {
+			if f.Name == "repo/other" {
+				off, e := f.DataOffset()
+				Expect(e).NotTo(HaveOccurred())
+				b[off+int64(f.CompressedSize64)+4] ^= 1
+				for i := 0; i+46+len(f.Name) <= len(b); i++ {
+					if bytes.Equal(b[i:i+4], []byte("PK\x01\x02")) && string(b[i+46:i+46+len(f.Name)]) == f.Name {
+						b[i+16] ^= 1
+						break
+					}
+				}
+			}
+		}
+		_, err = parseArchive(b, "1.0.0")
+		Expect(err).To(HaveOccurred())
+		_, err = parseArchiveMode(b, "1.0.0", false)
+		Expect(err).NotTo(HaveOccurred())
+	})
+	DescribeTable("enforces trusted redirect origins", func(target string, hops int, allowed bool) {
+		u, err := url.Parse(target)
+		Expect(err).NotTo(HaveOccurred())
+		via := make([]*http.Request, hops)
+		err = checkRedirect(&http.Request{URL: u}, via)
+		if allowed {
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			Expect(err).To(HaveOccurred())
+		}
+	}, Entry("GitHub API", "https://api.github.com/path", 1, true), Entry("codeload", "https://codeload.github.com/path", 1, true), Entry("HTTP", "http://codeload.github.com/path", 1, false), Entry("foreign origin", "https://example.com/path", 1, false), Entry("too many", "https://api.github.com/path", 5, false))
 })

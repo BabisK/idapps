@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/BabisK/idapps/internal/catalogue"
 	"github.com/BabisK/idapps/internal/storage"
+	"github.com/BabisK/idapps/internal/testutil"
 	"github.com/BabisK/idapps/internal/update"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -306,10 +307,7 @@ var _ = Describe("service lifecycle", func() {
 			store, e := update.NewStore(paths, "1.0.0")
 			Expect(e).NotTo(HaveOccurred())
 
-			b, e := catalogue.ReadTree("../../catalogue", "1.0.0")
-			Expect(e).NotTo(HaveOccurred())
-
-			cat, e := catalogue.Parse(b, "1.0.0")
+			cat, e := catalogue.ReadTree("../../catalogue", "1.0.0")
 			Expect(e).NotTo(HaveOccurred())
 
 			app := cat.Apps["postgres"]
@@ -325,16 +323,15 @@ var _ = Describe("service lifecycle", func() {
 			})
 			Expect(e).NotTo(HaveOccurred())
 
-			var doc map[string]any
-			{
-				e = json.Unmarshal(b, &doc)
-				Expect(e).NotTo(HaveOccurred())
-			}
-
-			doc["apps"].(map[string]any)["postgres"].(map[string]any)["containerName"] = "changed-postgres"
-			changed, e := json.Marshal(doc)
+			files, e := testutil.CatalogueFiles("../../catalogue")
 			Expect(e).NotTo(HaveOccurred())
-
+			var definition map[string]any
+			Expect(json.Unmarshal(files["repo/catalogue/postgres/app.json"], &definition)).To(Succeed())
+			definition["containerName"] = "changed-postgres"
+			files["repo/catalogue/postgres/app.json"], e = json.Marshal(definition)
+			Expect(e).NotTo(HaveOccurred())
+			changed, e := testutil.CatalogueArchive(files)
+			Expect(e).NotTo(HaveOccurred())
 			sum := sha256.Sum256(changed)
 			gen := &update.Generation{Commit: strings.Repeat("a", 40), SHA256: hex.EncodeToString(sum[:]), Bytes: changed}
 			reader, writer := io.Pipe()
@@ -602,9 +599,7 @@ var _ = Describe("Catalogue service Docker requests", func() {
 	var mock *MockRoundTripper
 	var store *update.Store
 	BeforeEach(func() {
-		document, err := catalogue.ReadTree("../../catalogue", "1.0.0")
-		Expect(err).NotTo(HaveOccurred())
-		parsed, err := catalogue.Parse(document, "0.0.0")
+		parsed, err := catalogue.ReadTree("../../catalogue", "0.0.0")
 		Expect(err).NotTo(HaveOccurred())
 		apps = parsed.Apps
 		base := GinkgoT().TempDir()

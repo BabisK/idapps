@@ -18,4 +18,4 @@ IDApps is a Go launcher for Docker-backed developer tools and short-lived servic
 - `_bmad-output/specs/spec-native-launcher/` contains the approved launcher contract and companions.
 - `docs/verification.md` records tested environments and verification gaps.
 
-Application descriptors live in `catalogue/<name>/app.json`, with shared metadata in `catalogue/metadata.json`. Validate the tree and release compatibility with `go run ./tools/catalogue-compat`.
+Application descriptors live in `catalogue/<name>/app.json`, with shared metadata in `catalogue/metadata.json`. Validate the catalogue with `go run ./tools/catalogue-compat`.

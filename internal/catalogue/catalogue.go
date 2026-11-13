@@ -73,19 +73,7 @@ type App struct {
 	Ports         []Port            `json:"ports"`
 }
 
-// Parse validates structure, duplicate keys, semantic constraints and version.
-func Parse(data []byte, launcherVersion string) (*Catalogue, error) {
-	if err := CheckJSON(data); err != nil {
-		return nil, err
-	}
-	var doc any
-	// Google's validator classifies json.Number as a string, so use the JSON
-	// decoder's float64 representation here. The typed decode below still
-	// rejects fractional or out-of-range integers before the catalogue is used.
-	d := json.NewDecoder(bytes.NewReader(data))
-	if err := d.Decode(&doc); err != nil {
-		return nil, err
-	}
+func validateApps(apps map[string]any, schemaVersion int, minimumVersion, launcherVersion string) (*Catalogue, error) {
 	var schemaDoc jsonschema.Schema
 	if err := json.Unmarshal(bytes.ReplaceAll(catalogueschema.Schema, []byte(`\\u0000`), []byte(`\\x00`)), &schemaDoc); err != nil {
 		return nil, err
@@ -94,29 +82,8 @@ func Parse(data []byte, launcherVersion string) (*Catalogue, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, ok := doc.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("invalid catalogue: expected object")
-	}
-	for key := range root {
-		if key != "$schema" && key != "schemaVersion" && key != "minimumLauncherVersion" && key != "apps" {
-			return nil, fmt.Errorf("invalid catalogue: unknown field %q", key)
-		}
-	}
-	if raw, exists := root["$schema"]; exists {
-		if _, ok := raw.(string); !ok {
-			return nil, fmt.Errorf("invalid catalogue: invalid schema reference")
-		}
-	}
-	if version, ok := root["schemaVersion"].(float64); !ok || version != 1 {
+	if schemaVersion != 1 {
 		return nil, fmt.Errorf("invalid catalogue: unsupported schema version")
-	}
-	if _, ok := root["minimumLauncherVersion"].(string); !ok {
-		return nil, fmt.Errorf("invalid catalogue: missing launcher version")
-	}
-	apps, ok := root["apps"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("invalid catalogue: missing apps")
 	}
 	for name, app := range apps {
 		if !validAppName(name) {
@@ -127,8 +94,19 @@ func Parse(data []byte, launcherVersion string) (*Catalogue, error) {
 		}
 	}
 	var c Catalogue
-	if err = json.Unmarshal(data, &c); err != nil {
-		return nil, err
+	c.SchemaVersion = 1
+	c.MinimumLauncherVersion = minimumVersion
+	c.Apps = make(map[string]App, len(apps))
+	for name, value := range apps {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		var app App
+		if err := json.Unmarshal(encoded, &app); err != nil {
+			return nil, err
+		}
+		c.Apps[name] = app
 	}
 	if !validVersion(c.MinimumLauncherVersion) {
 		return nil, fmt.Errorf("invalid minimum launcher version %q", c.MinimumLauncherVersion)
@@ -312,10 +290,14 @@ func ValidateServiceDefinition(name string, app App) error {
 		}
 		definition["mounts"] = mounts
 	}
-	data, err := json.Marshal(map[string]any{"schemaVersion": 1, "minimumLauncherVersion": "0.0.0", "apps": map[string]any{name: definition}})
+	data, err := json.Marshal(definition)
 	if err != nil {
 		return err
 	}
-	_, err = Parse(data, "0.0.0")
+	var appValue any
+	if err = json.Unmarshal(data, &appValue); err != nil {
+		return err
+	}
+	_, err = validateApps(map[string]any{name: appValue}, 1, "0.0.0", "0.0.0")
 	return err
 }

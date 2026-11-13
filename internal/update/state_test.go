@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/BabisK/idapps/internal/catalogue"
 	"github.com/BabisK/idapps/internal/storage"
+	"github.com/BabisK/idapps/internal/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"os"
@@ -24,7 +25,9 @@ func testStore(t GinkgoTInterface) (*Store, *Generation) {
 	s, e := NewStore(storage.Paths{Cache: filepath.Join(dir, "cache", "idapps", "catalogues"), Config: filepath.Join(dir, "config", "idapps"), Bin: filepath.Join(dir, "data", "idapps", "bin")}, "1.0.0")
 	Expect(e).NotTo(HaveOccurred())
 
-	b, e := catalogue.ReadTree("../../catalogue", "1.0.0")
+	files, e := testutil.CatalogueFiles("../../catalogue")
+	Expect(e).NotTo(HaveOccurred())
+	b, e := testutil.CatalogueArchive(files)
 	Expect(e).NotTo(HaveOccurred())
 
 	h := sha256.Sum256(b)
@@ -48,12 +51,11 @@ var _ = Describe("update reconciliation counts", func() {
 		Expect(activate(generation)).To(Equal(Reconciliation{Added: 22}))
 		Expect(activate(generation)).To(Equal(Reconciliation{Unchanged: 22}))
 		Expect(os.Remove(store.linkPath("psql"))).To(Succeed())
-		var doc map[string]any
-		Expect(json.Unmarshal(generation.Bytes, &doc)).To(Succeed())
-		apps := doc["apps"].(map[string]any)
-		apps["new-aws"] = apps["aws"]
-		delete(apps, "aws")
-		data, err := json.Marshal(doc)
+		files, err := testutil.CatalogueFiles("../../catalogue")
+		Expect(err).NotTo(HaveOccurred())
+		files["repo/catalogue/new-aws/app.json"] = files["repo/catalogue/aws/app.json"]
+		delete(files, "repo/catalogue/aws/app.json")
+		data, err := testutil.CatalogueArchive(files)
 		Expect(err).NotTo(HaveOccurred())
 		sum := sha256.Sum256(data)
 		next := &Generation{Commit: strings.Repeat("b", 40), SHA256: hex.EncodeToString(sum[:]), Bytes: data}
@@ -211,7 +213,7 @@ var _ = Describe("catalogue storage", func() {
 			}
 			{
 
-				e := os.Remove(filepath.Join(s.Paths.Cache, g.SHA256+".json"))
+				e := os.Remove(filepath.Join(s.Paths.Cache, g.SHA256+".zip"))
 				Expect(e).NotTo(HaveOccurred())
 			}
 
@@ -270,11 +272,9 @@ var _ = Describe("applying catalogue changes", func() {
 			originalHash = sha256.Sum256(before)
 			Expect(store.WithLock(context.Background(), func() error { return store.Activate(generation, exe) })).To(Succeed())
 
-			var doc map[string]any
-			Expect(json.Unmarshal(generation.Bytes, &doc)).To(Succeed())
-			apps := doc["apps"].(map[string]any)
-			retiredData, err := json.Marshal(apps["redis"])
+			files, err := testutil.CatalogueFiles("../../catalogue")
 			Expect(err).NotTo(HaveOccurred())
+			retiredData := files["repo/catalogue/redis/app.json"]
 			var definition catalogue.App
 			Expect(json.Unmarshal(retiredData, &definition)).To(Succeed())
 			Expect(store.WithLock(context.Background(), func() error {
@@ -286,12 +286,15 @@ var _ = Describe("applying catalogue changes", func() {
 				return store.SaveResources(id, records)
 			})).To(Succeed())
 
-			psql := apps["psql"]
-			delete(apps, "psql")
-			delete(apps, "redis")
-			apps["new-psql"] = psql
-			apps["redis-cli"].(map[string]any)["image"].(map[string]any)["tag"] = "0.0.0-fixture"
-			nextBytes, err := json.Marshal(doc)
+			files["repo/catalogue/new-psql/app.json"] = files["repo/catalogue/psql/app.json"]
+			delete(files, "repo/catalogue/psql/app.json")
+			delete(files, "repo/catalogue/redis/app.json")
+			var client map[string]any
+			Expect(json.Unmarshal(files["repo/catalogue/redis-cli/app.json"], &client)).To(Succeed())
+			client["image"].(map[string]any)["tag"] = "0.0.0-fixture"
+			files["repo/catalogue/redis-cli/app.json"], err = json.Marshal(client)
+			Expect(err).NotTo(HaveOccurred())
+			nextBytes, err := testutil.CatalogueArchive(files)
 			Expect(err).NotTo(HaveOccurred())
 			hash := sha256.Sum256(nextBytes)
 			next = &Generation{Commit: strings.Repeat("b", 40), SHA256: hex.EncodeToString(hash[:]), Bytes: nextBytes}
@@ -556,5 +559,83 @@ var _ = Describe("protecting update state", func() {
 				Expect(os.IsNotExist(err)).To(BeTrue(), "%v", err)
 			})
 		}
+	})
+})
+
+var _ = Describe("archive generation integrity", func() {
+	It("detects a corrupted cached archive", func() {
+		store, generation := testStore(GinkgoT())
+		exe := filepath.Join(GinkgoT().TempDir(), "idapps")
+		Expect(store.WithLock(context.Background(), func() error { return store.Activate(generation, exe) })).To(Succeed())
+		zipPath := filepath.Join(store.Paths.Cache, generation.SHA256+".zip")
+		Expect(os.WriteFile(zipPath, []byte("corrupt"), 0600)).To(Succeed())
+		_, _, err := store.Snapshot()
+		Expect(err).To(MatchError(ContainSubstring("corrupt")))
+	})
+})
+
+var _ = Describe("archive transaction rollback", func() {
+	for _, point := range []string{"journal", "link:aws", "activation"} {
+		point := point
+		It("restores the prior generation and links after "+point, func() {
+			store, old := testStore(GinkgoT())
+			oldExe := filepath.Join(GinkgoT().TempDir(), "old")
+			newExe := filepath.Join(GinkgoT().TempDir(), "new")
+			files := map[string][]byte{}
+			Expect(filepath.WalkDir("../../catalogue", func(p string, d os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if d.IsDir() {
+					return nil
+				}
+				rel, e := filepath.Rel("../../catalogue", p)
+				if e != nil {
+					return e
+				}
+				files["repo/catalogue/"+filepath.ToSlash(rel)], e = os.ReadFile(p)
+				return e
+			})).To(Succeed())
+			data := archiveFixture(files)
+			hash := sha256.Sum256(data)
+			next := &Generation{Commit: strings.Repeat("b", 40), SHA256: hex.EncodeToString(hash[:]), Bytes: data}
+			Expect(store.WithLock(context.Background(), func() error { return store.Activate(old, oldExe) })).To(Succeed())
+			prior := transactionFault
+			DeferCleanup(func() { transactionFault = prior })
+			reached := false
+			transactionFault = func(p string) error {
+				if p == point {
+					reached = true
+					return fmt.Errorf("injected interruption")
+				}
+				return nil
+			}
+			Expect(store.WithLock(context.Background(), func() error { return store.Activate(next, newExe) })).To(MatchError(ContainSubstring("injected interruption")))
+			Expect(reached).To(BeTrue())
+			st, err := store.loadState()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(st.Hash).To(Equal(old.SHA256))
+			for name := range st.Links {
+				target, err := os.Readlink(store.linkPath(name))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(target).To(Equal(oldExe))
+			}
+			_, commit, err := store.Snapshot()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(commit).To(Equal(old.Commit))
+		})
+	}
+})
+
+var _ = Describe("existing generation cache safety", func() {
+	It("rejects an oversized existing archive before activation", func() {
+		store, g := testStore(GinkgoT())
+		Expect(secureDir(store.Paths.Cache)).To(Succeed())
+		f, err := os.Create(filepath.Join(store.Paths.Cache, g.SHA256+".zip"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.Truncate(maxArchiveBytes + 1)).To(Succeed())
+		Expect(f.Close()).To(Succeed())
+		err = store.WithLock(context.Background(), func() error { return store.Activate(g, filepath.Join(GinkgoT().TempDir(), "idapps")) })
+		Expect(err).To(MatchError(ContainSubstring("oversized")))
 	})
 })
