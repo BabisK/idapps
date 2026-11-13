@@ -130,6 +130,12 @@ func fetch(ctx context.Context, client *http.Client, version, api, raw string) (
 		}
 		seen[entry.Path] = true
 		rel := entry.Path
+		if rel == "schema_embed.go" {
+			if entry.Type != "blob" || entry.Mode != "100644" {
+				return nil, fmt.Errorf("invalid schema embed source")
+			}
+			continue
+		}
 		if entry.Type == "tree" && entry.Mode == "040000" && !strings.Contains(rel, "/") {
 			dirs[rel] = true
 			continue

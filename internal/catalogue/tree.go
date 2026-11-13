@@ -13,6 +13,17 @@ import (
 
 var appName = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
 
+func validAppName(name string) bool {
+	if !appName.MatchString(name) {
+		return false
+	}
+	switch name {
+	case "idapps", "update", "run", "list", "version", "help", "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9":
+		return false
+	}
+	return true
+}
+
 // Assemble builds the legacy aggregate from metadata.json and app descriptors.
 // Each input is checked before decoding, so duplicate keys cannot be discarded.
 func Assemble(files map[string][]byte, version string) ([]byte, error) {
@@ -39,7 +50,7 @@ func Assemble(files map[string][]byte, version string) ([]byte, error) {
 	}
 	apps := make(map[string]json.RawMessage)
 	for name, data := range files {
-		if name == "metadata.json" || name == "catalogue.schema.json" {
+		if name == "metadata.json" || name == "catalogue.schema.json" || name == "schema_embed.go" {
 			continue
 		}
 		parts := strings.Split(name, "/")
@@ -95,6 +106,9 @@ func ReadTree(root string, version string) ([]byte, error) {
 		}
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("non-regular catalogue entry %q", rel)
+		}
+		if rel == "schema_embed.go" {
+			return nil
 		}
 		info, err := d.Info()
 		if err != nil {

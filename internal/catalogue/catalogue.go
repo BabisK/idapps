@@ -3,7 +3,6 @@ package catalogue
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,15 +10,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	catalogueschema "github.com/BabisK/idapps/catalogue"
 	"github.com/distribution/reference"
 	"github.com/google/jsonschema-go/jsonschema"
 	"golang.org/x/mod/semver"
 )
 
 const MaxBytes = 5 << 20
-
-//go:embed schema.json
-var schemaBytes []byte
 
 type Catalogue struct {
 	SchemaVersion          int            `json:"schemaVersion"`
@@ -90,15 +87,44 @@ func Parse(data []byte, launcherVersion string) (*Catalogue, error) {
 		return nil, err
 	}
 	var schemaDoc jsonschema.Schema
-	if err := json.Unmarshal(bytes.ReplaceAll(schemaBytes, []byte(`\\u0000`), []byte(`\\x00`)), &schemaDoc); err != nil {
+	if err := json.Unmarshal(bytes.ReplaceAll(catalogueschema.Schema, []byte(`\\u0000`), []byte(`\\x00`)), &schemaDoc); err != nil {
 		return nil, err
 	}
 	schema, err := schemaDoc.Resolve(nil)
 	if err != nil {
 		return nil, err
 	}
-	if err = schema.Validate(doc); err != nil {
-		return nil, fmt.Errorf("invalid catalogue: %w", err)
+	root, ok := doc.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid catalogue: expected object")
+	}
+	for key := range root {
+		if key != "$schema" && key != "schemaVersion" && key != "minimumLauncherVersion" && key != "apps" {
+			return nil, fmt.Errorf("invalid catalogue: unknown field %q", key)
+		}
+	}
+	if raw, exists := root["$schema"]; exists {
+		if _, ok := raw.(string); !ok {
+			return nil, fmt.Errorf("invalid catalogue: invalid schema reference")
+		}
+	}
+	if version, ok := root["schemaVersion"].(float64); !ok || version != 1 {
+		return nil, fmt.Errorf("invalid catalogue: unsupported schema version")
+	}
+	if _, ok := root["minimumLauncherVersion"].(string); !ok {
+		return nil, fmt.Errorf("invalid catalogue: missing launcher version")
+	}
+	apps, ok := root["apps"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid catalogue: missing apps")
+	}
+	for name, app := range apps {
+		if !validAppName(name) {
+			return nil, fmt.Errorf("invalid catalogue: invalid app name %q", name)
+		}
+		if err = schema.Validate(app); err != nil {
+			return nil, fmt.Errorf("invalid catalogue: %s: %w", name, err)
+		}
 	}
 	var c Catalogue
 	if err = json.Unmarshal(data, &c); err != nil {

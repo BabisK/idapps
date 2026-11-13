@@ -16,42 +16,6 @@
       "type": "string",
       "pattern": "^[^\\u0000]*$"
     },
-    "appName": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_-]{0,62}$",
-      "not": {
-        "enum": [
-          "idapps",
-          "update",
-          "run",
-          "list",
-          "version",
-          "help",
-          "con",
-          "prn",
-          "aux",
-          "nul",
-          "com1",
-          "com2",
-          "com3",
-          "com4",
-          "com5",
-          "com6",
-          "com7",
-          "com8",
-          "com9",
-          "lpt1",
-          "lpt2",
-          "lpt3",
-          "lpt4",
-          "lpt5",
-          "lpt6",
-          "lpt7",
-          "lpt8",
-          "lpt9"
-        ]
-      }
-    },
     "resourceName": {
       "type": "string",
       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
@@ -63,15 +27,18 @@
         "repository": {
           "type": "string",
           "pattern": "^[^\\u0000]*$",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Docker image repository, optionally registry-qualified, without a tag or digest."
         },
         "tag": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$"
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$",
+          "description": "Image tag used when no digest is specified."
         },
         "digest": {
           "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "Optional SHA-256 image digest; takes precedence over the tag."
         }
       },
       "required": [
@@ -87,11 +54,13 @@
           "enum": [
             "cwd",
             "home"
-          ]
+          ],
+          "description": "Host directory used as the base: the current working directory or the user home directory."
         },
         "path": {
           "type": "string",
-          "pattern": "^[^\\u0000]*$"
+          "pattern": "^[^\\u0000]*$",
+          "description": "Forward-slash-separated path relative to the base; an empty string selects the base itself."
         }
       },
       "required": [
@@ -104,21 +73,26 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "const": "bind"
+          "const": "bind",
+          "description": "Identifies this mount as a host directory bind mount."
         },
         "source": {
-          "$ref": "#/$defs/bindSource"
+          "$ref": "#/$defs/bindSource",
+          "description": "Host directory to mount into the container."
         },
         "target": {
           "type": "string",
           "pattern": "^/[^\\u0000]*$",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Absolute destination path inside the container."
         },
         "create": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Create a missing host directory when permitted; the current working directory cannot be created."
         },
         "readOnly": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Mount the host directory without write access when true."
         }
       },
       "required": [
@@ -134,18 +108,22 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "const": "volume"
+          "const": "volume",
+          "description": "Identifies this mount as a named Docker volume."
         },
         "name": {
-          "$ref": "#/$defs/resourceName"
+          "$ref": "#/$defs/resourceName",
+          "description": "Name of the Docker volume owned by this service."
         },
         "target": {
           "type": "string",
           "pattern": "^/[^\\u0000]*$",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Absolute destination path inside the container."
         },
         "readOnly": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Mount the volume without write access when true."
         }
       },
       "required": [
@@ -162,24 +140,28 @@
         "hostPort": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 65535
+          "maximum": 65535,
+          "description": "Port exposed on the host."
         },
         "containerPort": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 65535
+          "maximum": 65535,
+          "description": "Port inside the container to receive traffic."
         },
         "protocol": {
           "enum": [
             "tcp",
             "udp"
-          ]
+          ],
+          "description": "Transport protocol for the port binding."
         },
         "hostIP": {
           "enum": [
             "0.0.0.0",
             "127.0.0.1"
-          ]
+          ],
+          "description": "Host address on which to publish the port."
         }
       },
       "required": [
@@ -197,16 +179,19 @@
           "enum": [
             "host",
             "image"
-          ]
+          ],
+          "description": "Use the invoking user identity or the image default on Linux."
         },
         "windows": {
-          "const": "image"
+          "const": "image",
+          "description": "Use the image default user on Windows."
         },
         "darwin": {
           "enum": [
             "host",
             "image"
-          ]
+          ],
+          "description": "Use the invoking user identity or the image default on macOS."
         }
       },
       "required": [
@@ -220,27 +205,32 @@
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "const": "command"
+          "const": "command",
+          "description": "Identifies the app as a command."
         },
         "image": {
-          "$ref": "#/$defs/image"
+          "$ref": "#/$defs/image",
+          "description": "Container image used to run the app."
         },
         "entrypoint": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/literal"
-          }
+          },
+          "description": "Literal entrypoint arguments; omit to inherit the image entrypoint or use an empty array to clear it."
         },
         "args": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/literal"
-          }
+          },
+          "description": "Literal arguments prepended to user arguments; when omitted, user arguments replace the image command, or the image command is inherited if none are supplied."
         },
         "workdir": {
           "type": "string",
           "pattern": "^/[^\\u0000]*$",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Absolute working directory inside the container."
         },
         "environment": {
           "type": "object",
@@ -249,22 +239,26 @@
           },
           "additionalProperties": {
             "$ref": "#/$defs/literal"
-          }
+          },
+          "description": "Literal environment variables passed to the container."
         },
         "network": {
           "enum": [
             "host",
             "bridge"
-          ]
+          ],
+          "description": "Docker network mode used by the container."
         },
         "user": {
-          "$ref": "#/$defs/user"
+          "$ref": "#/$defs/user",
+          "description": "Container user policy for each supported host operating system."
         },
         "mounts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/bind"
-          }
+          },
+          "description": "Host directories mounted into the command container."
         }
       },
       "required": [
@@ -279,27 +273,32 @@
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "const": "service"
+          "const": "service",
+          "description": "Identifies the app as a service."
         },
         "image": {
-          "$ref": "#/$defs/image"
+          "$ref": "#/$defs/image",
+          "description": "Container image used to run the app."
         },
         "entrypoint": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/literal"
-          }
+          },
+          "description": "Literal entrypoint arguments; omit to inherit the image entrypoint or use an empty array to clear it."
         },
         "args": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/literal"
-          }
+          },
+          "description": "Literal container command arguments; omit to inherit the image command."
         },
         "workdir": {
           "type": "string",
           "pattern": "^/[^\\u0000]*$",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Absolute working directory inside the container."
         },
         "environment": {
           "type": "object",
@@ -308,33 +307,39 @@
           },
           "additionalProperties": {
             "$ref": "#/$defs/literal"
-          }
+          },
+          "description": "Literal environment variables passed to the container."
         },
         "network": {
           "enum": [
             "host",
             "bridge"
-          ]
+          ],
+          "description": "Docker network mode used by the container."
         },
         "user": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "linux": {
-              "const": "image"
+              "const": "image",
+              "description": "Use the image default user on Linux."
             },
             "windows": {
-              "const": "image"
+              "const": "image",
+              "description": "Use the image default user on Windows."
             },
             "darwin": {
-              "const": "image"
+              "const": "image",
+              "description": "Use the image default user on macOS."
             }
           },
           "required": [
             "linux",
             "windows",
             "darwin"
-          ]
+          ],
+          "description": "Services use the image default user on every supported host."
         },
         "mounts": {
           "type": "array",
@@ -347,16 +352,19 @@
                 "$ref": "#/$defs/volume"
               }
             ]
-          }
+          },
+          "description": "Directories or volumes mounted into the container."
         },
         "containerName": {
-          "$ref": "#/$defs/resourceName"
+          "$ref": "#/$defs/resourceName",
+          "description": "Docker container name reserved for this service."
         },
         "ports": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/port"
-          }
+          },
+          "description": "Host port bindings for the service; must be empty with host networking."
         }
       },
       "required": [
@@ -372,14 +380,16 @@
           "if": {
             "properties": {
               "network": {
-                "const": "host"
+                "const": "host",
+                "description": "Network mode selected for the service."
               }
             }
           },
           "then": {
             "properties": {
               "ports": {
-                "maxItems": 0
+                "maxItems": 0,
+                "description": "Host networking requires no published port bindings."
               }
             }
           }
