@@ -2,7 +2,7 @@
   "kind": "command",
   "image": {
     "repository": "amazon/aws-cli",
-    "tag": "2.40.1"
+    "tag": "2.40.3"
   },
   "network": "host",
   "user": {
