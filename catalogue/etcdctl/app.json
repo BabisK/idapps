@@ -2,7 +2,7 @@
   "kind": "command",
   "image": {
     "repository": "gcr.io/etcd-development/etcd",
-    "tag": "v3.7.3"
+    "tag": "v3.7.4"
   },
   "network": "host",
   "user": {
